@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CrashPY · El crash paraguayo 🇵🇾</title>
+  <meta name="description" content="CrashPY: el crash en tiempo real en guaraníes. Apostá, mirá cómo sube el cohete y retirá antes de que explote.">
+  <meta name="theme-color" content="#060913">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CrashPY">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/img/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div class="conn-banner" id="connBanner" hidden>Reconectando…</div>
+  <div class="site-banner" id="siteBanner" hidden></div>
+
+  <header class="topbar">
+    <a class="logo" href="/" aria-label="CrashPY inicio">
+      <img src="/img/icon.svg" alt="" width="34" height="34">
+      <span class="logo-text">Crash<b>PY</b></span>
+    </a>
+    <div class="top-right">
+      <div class="online-pill" title="Conectados ahora"><span class="live-dot"></span><span id="onlineCount">0</span></div>
+      <div class="guest-actions" id="guestActions">
+        <button class="btn btn-ghost btn-sm" id="btnLogin" type="button">Ingresar</button>
+        <button class="btn btn-primary btn-sm" id="btnRegister" type="button">Registrarse</button>
+      </div>
+      <div class="user-actions" id="userActions" hidden>
+        <button class="balance-pill" id="balancePill" type="button" title="Mi billetera">
+          <span class="bal-label">Saldo</span>
+          <span class="bal-value" id="balance">Gs. 0</span>
+        </button>
+        <button class="btn btn-primary btn-sm btn-deposit" id="btnDeposit" type="button"><span>＋</span><span class="hide-xs">Depositar</span></button>
+      </div>
+      <button class="icon-btn" id="btnSound" type="button" title="Sonido" aria-label="Sonido">🔊</button>
+      <button class="icon-btn" id="btnMenu" type="button" aria-label="Menú">☰</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="game-col">
+      <div class="history-bar">
+        <div class="history-list" id="historyList"></div>
+        <button class="history-more" id="btnHistory" type="button" title="Historial de rondas">🕒</button>
+      </div>
+
+      <div class="stage" id="stage">
+        <canvas id="graph"></canvas>
+        <div class="stage-overlay">
+          <div class="stage-status" id="stageStatus"></div>
+          <div class="stage-mult" id="stageMult">—</div>
+          <div class="stage-sub" id="stageSub">Conectando…</div>
+          <div class="countdown" id="countdown" hidden><div class="countdown-bar" id="countdownBar"></div></div>
+        </div>
+        <div class="stage-info">
+          <span id="roundLabel">Ronda #—</span>
+          <span class="stage-info-right"><span id="roundPlayers">👥 0</span><span id="roundTotal">Gs. 0</span></span>
+        </div>
+        <div class="stage-flash" id="stageFlash"></div>
+        <div class="win-layer" id="winLayer"></div>
+      </div>
+
+      <div class="bet-panels" id="betPanels"></div>
+      <button class="add-panel" id="btnAddPanel" type="button">＋ Agregar segunda apuesta</button>
+    </section>
+
+    <aside class="side-col card" id="sideCol">
+      <div class="tabs side-tabs" id="sideTabs">
+        <button type="button" data-tab="bets" class="active">En vivo <span class="tab-count" id="betsCount">0</span></button>
+        <button type="button" data-tab="mine">Mis apuestas</button>
+        <button type="button" data-tab="top">Top 🏆</button>
+      </div>
+      <div class="side-body">
+        <div class="tab-pane" data-pane="bets">
+          <div class="bets-summary">
+            <span id="betsPlayers">0 jugadores</span>
+            <span>Total <b id="betsTotal">Gs. 0</b></span>
+          </div>
+          <div class="bets-head"><span>Jugador</span><span class="num">Apuesta</span><span class="num">x</span><span class="num">Ganancia</span></div>
+          <div class="bets-list" id="betsList"></div>
+        </div>
+        <div class="tab-pane" data-pane="mine" hidden>
+          <div class="mine-list" id="mineList"></div>
+        </div>
+        <div class="tab-pane" data-pane="top" hidden>
+          <div class="tabs top-period" id="topPeriod">
+            <button type="button" data-period="day" class="active">Hoy</button>
+            <button type="button" data-period="week">Semana</button>
+            <button type="button" data-period="month">Mes</button>
+          </div>
+          <div class="top-list" id="topList"></div>
+        </div>
+      </div>
+    </aside>
+
+    <aside class="chat-col card" id="chat" aria-label="Chat">
+      <div class="chat-head">
+        <span class="chat-title">💬 Chat <span class="chat-online" id="chatOnline"></span></span>
+        <button class="icon-btn chat-close" id="chatClose" type="button" aria-label="Cerrar chat">✕</button>
+      </div>
+      <div class="chat-list" id="chatList"></div>
+      <button class="chat-new" id="chatNew" type="button" hidden>Nuevos mensajes ↓</button>
+      <form class="chat-form" id="chatForm" autocomplete="off">
+        <div class="emoji-picker" id="emojiPicker" hidden></div>
+        <button type="button" class="icon-btn" id="emojiBtn" aria-label="Emojis">😀</button>
+        <input class="input" id="chatInput" maxlength="200" placeholder="Escribí un mensaje…" enterkeyhint="send">
+        <button class="btn btn-blue chat-send" type="submit" aria-label="Enviar">➤</button>
+      </form>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <span>🔞 Solo mayores de 18 · Jugá con responsabilidad</span>
+    <span class="footer-links"><a href="/fair">🔐 Provably fair</a> · <a href="#" id="linkRules">Reglas</a></span>
+  </footer>
+
+  <button class="chat-fab" id="chatFab" type="button" aria-label="Abrir chat">💬<span class="badge" id="chatBadge" hidden>0</span></button>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <nav class="drawer" id="drawer" aria-label="Menú"></nav>
+
+  <template id="tplBetPanel">
+    <div class="bet-panel">
+      <button class="bp-remove" type="button" title="Quitar esta apuesta" aria-label="Quitar">−</button>
+      <div class="bp-main">
+        <div class="bp-controls">
+          <div class="amount-row">
+            <button class="amt-btn" type="button" data-act="minus" aria-label="Menos">−</button>
+            <label class="amount-field">
+              <input class="amount-input" inputmode="numeric" autocomplete="off" aria-label="Monto de la apuesta en guaraníes">
+            </label>
+            <button class="amt-btn" type="button" data-act="plus" aria-label="Más">+</button>
+          </div>
+          <div class="quick-row"></div>
+        </div>
+        <button class="bp-action" type="button">
+          <span class="bp-action-title">APOSTAR</span>
+          <span class="bp-action-sub"></span>
+        </button>
+      </div>
+      <div class="bp-auto">
+        <label class="switch"><input type="checkbox" class="auto-bet"><span class="track"></span>Auto apuesta</label>
+        <div class="auto-cash">
+          <label class="switch"><input type="checkbox" class="auto-cash-on"><span class="track"></span>Auto retiro</label>
+          <label class="auto-cash-field"><input class="auto-cash-input" inputmode="decimal" autocomplete="off" aria-label="Retiro automático"><span>x</span></label>
+        </div>
+      </div>
+      <div class="bp-note"></div>
+    </div>
+  </template>
+
+  <script src="/socket.io/socket.io.min.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
