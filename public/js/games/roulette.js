@@ -583,7 +583,13 @@ class Wheel {
     this.win = null;
     if ('ResizeObserver' in window) new ResizeObserver(() => this.resize()).observe(this.el);
     else window.addEventListener('resize', () => this.resize());
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.size && this.draw());
+    // Los números de la rueda usan Rubik: se redibuja cuando termina de cargar
+    if (document.fonts && document.fonts.load) {
+      document.fonts
+        .load('800 20px Rubik')
+        .then(() => this.size && this.draw())
+        .catch(() => {});
+    }
   }
 
   resize() {
@@ -638,7 +644,7 @@ class Wheel {
 
   render() {
     this.rotor.style.transform = `rotate(${this.angle}rad)`;
-    this.ball.hidden = !this.ballOn;
+    if (this.ball.hidden === this.ballOn) this.ball.hidden = !this.ballOn;
     if (!this.ballOn || !this.size) return;
     const c = this.size / 2;
     const R = c - 2;
@@ -765,6 +771,10 @@ export function createRoulette(shell) {
       const p = { btn, x: e.clientX, y: e.clientY, fired: false, timer: 0 };
       p.timer = setTimeout(() => {
         if (press !== p) return;
+        if (spinning || !bets.get(btn.dataset.key)) {
+          press = null; // casilla vacía: al soltar cuenta como un toque normal
+          return;
+        }
         p.fired = true;
         removeChip(btn.dataset.key);
         vibrate(25);
@@ -935,8 +945,10 @@ export function createRoulette(shell) {
 
   function buildChips() {
     chipValues = computeChips(S());
-    if (!chipValues.includes(chip)) {
-      const lower = chipValues.filter((v) => v <= chip);
+    const wanted = Number(store.get('cpy_rl_chip', chip)) || chip; // la ficha que eligió el jugador
+    if (chipValues.includes(wanted)) chip = wanted;
+    else {
+      const lower = chipValues.filter((v) => v <= wanted);
       chip = lower.length ? lower[lower.length - 1] : chipValues[0];
     }
     el.chips.replaceChildren(
@@ -1346,9 +1358,11 @@ export function createRoulette(shell) {
     else note(`Salió el ${tag} · suerte la próxima 🍀`, 'bad');
     if (!silent) {
       if (payout > amount) {
-        el.result.show({ win: true, head: tag, detail: `Ganaste ${fmtGs(payout)}`, big });
-        winPop(el.winLayer, { amount: payout - amount, label: straight ? `¡Pleno al ${n}! 🎯` : `¡Salió el ${n}!`, big });
-        if (big) confetti(el.stage);
+        el.result.show({ win: true, head: tag, detail: `Ganaste ${fmtGs(payout)}`, big, ms: big ? 3200 : 2600 });
+        if (big) {
+          winPop(el.winLayer, { amount: payout - amount, label: straight ? `¡Pleno al ${n}! 🎯` : `¡Salió el ${n}!`, big });
+          confetti(el.stage);
+        }
         sound.win(big);
         vibrate(big ? [30, 40, 30, 40, 60] : [25, 30, 25]);
       } else if (payout > 0) {

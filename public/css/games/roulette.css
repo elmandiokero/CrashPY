@@ -242,6 +242,11 @@
   }
 }
 
+/* El premio flotante sale debajo del cartel de resultado (que va en el centro de la rueda) */
+.rl-stage .win-pop {
+  top: 70%;
+}
+
 .rl-ball {
   position: absolute;
   left: 0;
