@@ -153,7 +153,12 @@ async function main() {
     console.log(`   En esta PC:       http://localhost:${config.PORT}`);
     for (const ip of lanAddresses()) console.log(`   En tu WiFi (cel): http://${ip}:${config.PORT}`);
     console.log(`   Panel de admin:   http://localhost:${config.PORT}/admin`);
-    console.log(`\n   Para jugar desde internet abrí el túnel de Cloudflare (TUNEL-CLOUDFLARE.bat)`);
+    if (config.PUBLIC_URL) {
+      console.log(`\n   🌐 Desde internet: ${config.PUBLIC_URL}   (admin: ${config.PUBLIC_URL}/admin)`);
+      console.log('      Necesita el túnel de Cloudflare funcionando (servicio o TUNEL-CLOUDFLARE.bat)');
+    } else {
+      console.log(`\n   Para jugar desde internet abrí el túnel de Cloudflare (TUNEL-CLOUDFLARE.bat)`);
+    }
     console.log('   Para apagar el servidor: Ctrl + C\n');
   });
 }

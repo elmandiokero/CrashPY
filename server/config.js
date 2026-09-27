@@ -36,4 +36,6 @@ module.exports = {
   HOUSE_EDGE_BPS: Math.round(houseEdgePercent * 100),
   CHAIN_LENGTH: Math.min(10_000_000, Math.max(1000, int('CHAIN_LENGTH', 1_000_000))),
   SESSION_DAYS: int('SESSION_DAYS', 30),
+  // Dirección pública del juego (dominio en Cloudflare). Solo se usa para mostrarla al arrancar.
+  PUBLIC_URL: String(process.env.PUBLIC_URL || '').trim().replace(/\/+$/, ''),
 };

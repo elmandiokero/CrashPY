@@ -67,16 +67,31 @@ Cloudflare Tunnel conecta tu PC con internet **sin abrir puertos en el router** 
 
 ⚠️ Esa dirección **cambia cada vez** que abrís el túnel. Sirve para probar; para el día a día usá la opción B.
 
-### Opción B — Permanente (tu propio dominio, ej. `crashpy.com.py`)
-Necesitás una cuenta gratis en Cloudflare y un dominio agregado a Cloudflare.
+### Opción B — Permanente con tu dominio (ej. `https://crash.alexlamasg.lat`)
+Necesitás el dominio agregado a Cloudflare (plan gratis). Se hace una sola vez:
 
-**Desde el panel web (más fácil):**
-1. Entrá a <https://one.dash.cloudflare.com> → **Networks → Tunnels → Create a tunnel** → tipo *Cloudflared* → ponele de nombre `crashpy`.
-2. Elegí **Windows** y copiá el comando que te muestra (`cloudflared.exe service install eyJ...`). Ejecutalo en **PowerShell como administrador**: queda instalado como servicio y arranca solo con Windows.
-3. En **Public Hostname** agregá: *Subdomain* `juego` (o vacío), *Domain* tu dominio, *Service* `HTTP` → `localhost:3000`.
-4. Listo: el juego queda en `https://juego.tudominio.com` y el panel en `https://juego.tudominio.com/admin`.
+**1. Crear el túnel en Cloudflare (desde el navegador)**
+1. Entrá a <https://one.dash.cloudflare.com> (también aparece como **Zero Trust** en el menú de tu cuenta de Cloudflare). Si te pide elegir plan, elegí **Free**.
+2. Andá a **Networks → Tunnels** (en algunas cuentas: *Networks → Connectors → Cloudflare Tunnels*) → **Create a tunnel** → **Cloudflared** → nombre: `crashpy` → **Save tunnel**.
+3. En la pantalla de instalación elegí **Windows** y **copiá el comando** que aparece (`cloudflared.exe service install eyJ...`). Guardalo, lo usás en el paso 2.
+4. **Next** → en **Public Hostname** (o *Published application routes*) completá:
+   - **Subdomain**: `crash` · **Domain**: `alexlamasg.lat` · **Path**: vacío
+   - **Service**: Type `HTTP` · URL `localhost:3000`
+   - **Save**. Cloudflare crea solo el registro DNS `crash` → no hace falta tocar DNS.
+   > Si da error porque ya existe un registro `crash` en **DNS → Records**, borralo y guardá de nuevo.
 
-**Desde la consola (alternativa):**
+**2. Conectar tu PC**
+1. Abrí `INICIAR.bat` (el juego tiene que estar corriendo).
+2. Abrí **`TUNEL-CLOUDFLARE.bat`**, **pegá el comando** que copiaste y apretá Enter. Si no tenías `cloudflared`, el script lo instala solo.
+   Queda guardado en `cloudflared-token.txt`, así que las próximas veces solo abrís el `.bat`.
+3. Cuando en esa ventana aparezca `Registered tunnel connection`, entrá desde el celular a **https://crash.alexlamasg.lat** 🎉 (panel: `https://crash.alexlamasg.lat/admin`).
+
+**3. (Recomendado) Dejarlo siempre encendido**
+Hacé doble clic en **`INSTALAR-TUNEL-SERVICIO.bat`** (pide permiso de administrador): instala el túnel como servicio de Windows y arranca solo con la PC. Desde ahí solo necesitás `INICIAR.bat`.
+
+> ⚠️ El archivo `cloudflared-token.txt` es una llave de tu túnel: no lo compartas ni lo subas a GitHub (ya está excluido en `.gitignore`).
+
+**Desde la consola (alternativa avanzada):**
 ```
 cloudflared tunnel login
 cloudflared tunnel create crashpy
@@ -170,6 +185,10 @@ La ronda queda marcada como **anulada** en el historial público junto con su ha
 | Me olvidé la contraseña del admin | Con el servidor apagado ejecutá `npm run reset-admin -- NuevaClave123` en la carpeta del proyecto. |
 | El celular no entra por WiFi | Permití "Node.js" en el Firewall de Windows (Redes privadas) y verificá que estén en la misma red. |
 | La dirección trycloudflare cambió | Es normal en la opción rápida. Usá la opción B (dominio propio) para una dirección fija. |
+| Cloudflare muestra **Error 1033** | El túnel no está conectado: abrí `TUNEL-CLOUDFLARE.bat` (o revisá que el servicio `cloudflared` esté iniciado). |
+| Cloudflare muestra **502 Bad Gateway** | El túnel funciona pero el juego no: abrí `INICIAR.bat` y revisá que el túnel apunte a `localhost:3000` (el mismo `PORT` del `.env`). |
+| El juego queda en "Reconectando…" por internet | En Cloudflare → tu dominio → **Network**: **WebSockets** activado. Y no uses el modo *Under Attack* para este subdominio. |
+| Cambió el token o querés otro túnel | Borrá `cloudflared-token.txt` y abrí `TUNEL-CLOUDFLARE.bat` de nuevo. |
 
 ## ⚖️ Aviso legal
 
