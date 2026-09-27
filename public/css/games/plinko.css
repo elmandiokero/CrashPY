@@ -1,0 +1,273 @@
+/* ═══════════════ 🔴 Plinko ═══════════════ */
+
+.pk-stage {
+  container: pkstage / inline-size;
+  padding: 10px 8px 10px;
+  background:
+    radial-gradient(75% 40% at 50% 100%, rgba(255, 70, 60, 0.13), transparent 70%),
+    radial-gradient(120% 70% at 50% 0%, rgba(61, 123, 255, 0.16), transparent 62%),
+    linear-gradient(180deg, #0b1028, #070a1a);
+}
+
+.pk-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'info' 'hist' 'board';
+  gap: 8px;
+}
+
+/* Filas · riesgo · máximo */
+.pk-info {
+  grid-area: info;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.pk-info-l {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.pk-info-r {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.pk-info-r b {
+  color: var(--gold);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 12px rgba(255, 197, 61, 0.35);
+}
+
+/* Últimos resultados */
+.pk-hist {
+  grid-area: hist;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.pk-chip {
+  display: grid;
+  place-items: center;
+  height: 26px;
+  min-width: 0;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: #2a0f00;
+  white-space: nowrap;
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button.pk-chip:active {
+  transform: scale(0.94);
+}
+
+.pk-chip.pk-empty {
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+.pk-chip.pk-hot {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2),
+    0 0 12px var(--pk-glow, rgba(255, 59, 78, 0.5));
+}
+
+.pk-chip.pk-new {
+  animation: pkChipIn 0.38s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+@keyframes pkChipIn {
+  from {
+    transform: scale(0.35);
+    opacity: 0;
+  }
+}
+
+/* Premio grande: el cartel un poco más arriba y el "+Gs." debajo, sin pisarse */
+.pk-stage > .gv-result {
+  top: 42%;
+}
+
+.pk-stage > .win-layer {
+  top: 22%;
+}
+
+/* Tablero */
+.pk-board {
+  grid-area: board;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 0.98;
+  max-height: max(260px, calc(100vh - 200px));
+  max-height: max(260px, calc(100dvh - 200px));
+}
+
+.pk-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Escenario ancho: resultados en una columna a la derecha del tablero */
+@container pkstage (min-width: 560px) {
+  .pk-layout {
+    grid-template-columns: minmax(0, 1fr) 62px;
+    grid-template-areas:
+      'info info'
+      'board hist';
+    column-gap: 10px;
+    row-gap: 6px;
+  }
+
+  .pk-hist {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: 30px;
+    align-content: center;
+    gap: 6px;
+  }
+
+  .pk-chip {
+    height: 30px;
+    font-size: 0.78rem;
+  }
+}
+
+/* Panel */
+.pk-risk button.active[data-value='low'] {
+  background: rgba(43, 217, 107, 0.18);
+  color: #9ff5c0;
+  box-shadow: inset 0 0 0 1px rgba(43, 217, 107, 0.45);
+}
+
+.pk-risk button.active[data-value='medium'] {
+  background: rgba(255, 138, 61, 0.2);
+  color: #ffc796;
+  box-shadow: inset 0 0 0 1px rgba(255, 138, 61, 0.5);
+}
+
+.pk-risk button.active[data-value='high'] {
+  background: rgba(255, 59, 78, 0.22);
+  color: #ffa3ad;
+  box-shadow: inset 0 0 0 1px rgba(255, 59, 78, 0.55);
+}
+
+.pk-rows button {
+  font-variant-numeric: tabular-nums;
+}
+
+/* El premio máximo necesita más lugar que el multiplicador */
+.pk-stats {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.25fr);
+}
+
+.pk-stats .gv-stat b {
+  font-size: 0.92rem;
+}
+
+.pk-auto .gv-label {
+  align-items: center;
+}
+
+.pk-auto-hint {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--faint);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.pk-auto-pick button {
+  padding: 8px 0;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.pk-auto-pick button:disabled {
+  opacity: 0.5;
+}
+
+.pk-auto-run {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.pk-auto-meter {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pk-auto-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.pk-auto-info b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.pk-auto-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.pk-auto-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffc53d, #ff8a3d, #ff3b4e);
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 0.25s ease;
+}
+
+.pk-auto-stop {
+  flex-shrink: 0;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pk-chip.pk-new,
+  .pk-auto-bar i {
+    animation: none;
+    transition: none;
+  }
+}

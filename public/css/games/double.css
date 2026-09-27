@@ -1,0 +1,1203 @@
+/* ═══════════════ 🎡 Double ═══════════════ */
+/* Los colores van con prefijo (db-red, db-black, db-white): base.css ya usa .red/.green/.gold para el texto. */
+
+/* Escenario + panel + columnas de apuestas (en PC las columnas quedan bajo la cinta) */
+.gv.gv-double {
+  grid-template-areas: 'stage' 'panel' 'bets';
+}
+
+@container gameview (min-width: 620px) {
+  .gv.gv-double {
+    grid-template-columns: 272px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: 'panel stage' 'panel bets';
+  }
+}
+
+/* En el celular los botones de color van primero, justo bajo la cinta */
+@container gameview (max-width: 619px) {
+  .gv-double .gv-panel > .db-pick {
+    order: -2;
+  }
+
+  .gv-double .db-pick > .gv-label {
+    display: none;
+  }
+}
+
+.db-star {
+  display: block;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+
+/* ───────── Escenario ───────── */
+.db-stage {
+  container: dbstage / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 0 12px;
+  background:
+    radial-gradient(80% 60% at 50% 62%, rgba(241, 44, 76, 0.08), transparent 70%),
+    radial-gradient(120% 90% at 50% 0%, rgba(61, 123, 255, 0.14), transparent 60%),
+    linear-gradient(180deg, #0b1028, #070a1a);
+}
+
+@container gameview (min-width: 620px) {
+  .db-stage {
+    gap: 14px;
+    padding: 16px 0;
+  }
+}
+
+/* El festejo no tapa la cinta: el cartel va arriba (sobre el historial) y el premio sube desde abajo */
+.db-stage .gv-result {
+  top: 8px;
+  min-width: 150px;
+  padding: 8px 20px 9px;
+  transform: translate(-50%, 0) scale(0.6);
+}
+
+.db-stage .gv-result.show {
+  transform: translate(-50%, 0) scale(1);
+}
+
+.db-stage .gv-result .r-mult {
+  font-size: 1.75rem;
+}
+
+.db-stage .gv-result .r-amount {
+  margin-top: 1px;
+  font-size: 0.9rem;
+}
+
+.db-stage .win-pop {
+  top: auto;
+  bottom: 6px;
+}
+
+.db-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
+.db-glow.on {
+  opacity: 1;
+}
+
+.db-glow.db-red {
+  background: radial-gradient(65% 55% at 50% 58%, rgba(241, 44, 76, 0.26), transparent 72%);
+}
+
+.db-glow.db-black {
+  background: radial-gradient(65% 55% at 50% 58%, rgba(120, 135, 210, 0.16), transparent 72%);
+}
+
+.db-glow.db-white {
+  background: radial-gradient(65% 55% at 50% 58%, rgba(255, 255, 255, 0.24), rgba(255, 197, 61, 0.1) 45%, transparent 75%);
+}
+
+.db-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.db-flash.db-red {
+  background: radial-gradient(circle at 50% 52%, rgba(255, 90, 117, 0.5), transparent 62%);
+}
+
+.db-flash.db-black {
+  background: radial-gradient(circle at 50% 52%, rgba(170, 182, 255, 0.28), transparent 62%);
+}
+
+.db-flash.db-white {
+  background: radial-gradient(circle at 50% 52%, rgba(255, 255, 255, 0.75), rgba(255, 197, 61, 0.3) 40%, transparent 70%);
+}
+
+.db-flash.go {
+  animation: dbFlash 0.75s ease-out;
+}
+
+@keyframes dbFlash {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Ronda + estadística de las últimas 100 */
+.db-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
+  padding: 0 14px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.db-round {
+  white-space: nowrap;
+}
+
+.db-l100 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.db-l100-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.db-l100-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.db-l100-chip i {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  display: inline-grid;
+  place-items: center;
+}
+
+.db-l100-chip.db-red i {
+  background: #f12c4c;
+}
+
+.db-l100-chip.db-black i {
+  background: #2d3148;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.db-l100-chip.db-white i {
+  background: #fff;
+  color: #f12c4c;
+}
+
+.db-l100-chip i .db-star {
+  width: 9px;
+  height: 9px;
+}
+
+/* Historial (las más nuevas a la izquierda) */
+.db-history {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 2px 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, #000 86%, transparent);
+  mask-image: linear-gradient(90deg, #000 86%, transparent);
+}
+
+.db-history::-webkit-scrollbar {
+  display: none;
+}
+
+.db-hist {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  transition: transform 0.12s ease;
+}
+
+.db-hist.db-red {
+  background: linear-gradient(180deg, #ff5470, #e0233f);
+}
+
+.db-hist.db-black {
+  background: linear-gradient(180deg, #373c56, #22263a);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.db-hist.db-white {
+  background: linear-gradient(180deg, #ffffff, #e3e7f5);
+  color: #f12c4c;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.db-hist .db-star {
+  width: 15px;
+  height: 15px;
+}
+
+.db-hist:first-child {
+  box-shadow: 0 0 0 2px rgba(255, 197, 61, 0.75);
+}
+
+@media (hover: hover) {
+  .db-hist:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.db-hist.new {
+  animation: dbHistIn 0.55s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes dbHistIn {
+  from {
+    transform: translateX(-14px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+.db-hist-empty {
+  font-size: 0.76rem;
+  color: var(--faint);
+}
+
+/* ───────── La cinta ───────── */
+.db-band {
+  --db-tile: 52px;
+  --db-gap: 6px;
+  --db-r: 11px;
+  position: relative;
+  height: calc(var(--db-tile) + 28px);
+  background: linear-gradient(180deg, rgba(3, 5, 14, 0.8), rgba(13, 18, 42, 0.9) 50%, rgba(3, 5, 14, 0.8));
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    inset 0 14px 18px -14px rgba(0, 0, 0, 0.9),
+    inset 0 -14px 18px -14px rgba(0, 0, 0, 0.9);
+}
+
+@container dbstage (min-width: 420px) {
+  .db-band {
+    --db-tile: 62px;
+    --db-gap: 8px;
+    --db-r: 13px;
+  }
+}
+
+@container dbstage (min-width: 600px) {
+  .db-band {
+    --db-tile: 66px;
+    --db-gap: 8px;
+    --db-r: 14px;
+  }
+}
+
+@container dbstage (min-width: 820px) {
+  .db-band {
+    --db-tile: 72px;
+    --db-gap: 9px;
+    --db-r: 15px;
+  }
+}
+
+.db-window {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 15%, #000 85%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 15%, #000 85%, transparent 100%);
+}
+
+.db-strip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: max-content;
+  display: flex;
+  align-items: center;
+  gap: var(--db-gap);
+  will-change: transform;
+}
+
+.db-tile {
+  position: relative;
+  flex: none;
+  width: var(--db-tile);
+  height: var(--db-tile);
+  border-radius: var(--db-r);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  color: #fff;
+  font-weight: 900;
+  font-size: calc(var(--db-tile) * 0.36);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: transform 0.45s cubic-bezier(0.2, 1.5, 0.4, 1), box-shadow 0.35s ease;
+}
+
+.db-tile::before {
+  content: '';
+  position: absolute;
+  inset: 14%;
+  border-radius: calc(var(--db-r) * 0.62);
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  pointer-events: none;
+}
+
+.db-tile.db-red {
+  background: linear-gradient(180deg, #ff5a75 0%, #f12c4c 52%, #c91a3a 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+}
+
+.db-tile.db-black {
+  background: linear-gradient(180deg, #383d57 0%, #262a3d 52%, #1b1e2d 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -3px 0 rgba(0, 0, 0, 0.28);
+}
+
+.db-tile.db-black::before {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.db-tile.db-white {
+  background: linear-gradient(180deg, #ffffff 0%, #f1f3fb 52%, #d9deef 100%);
+  color: #f12c4c;
+  text-shadow: none;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12), 0 0 16px rgba(255, 255, 255, 0.3);
+}
+
+.db-tile.db-white::before {
+  border-color: rgba(241, 44, 76, 0.25);
+}
+
+.db-tile .db-star {
+  width: calc(var(--db-tile) * 0.38);
+  height: calc(var(--db-tile) * 0.38);
+}
+
+.db-tile .db-x {
+  font-size: calc(var(--db-tile) * 0.16);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  margin-top: 1px;
+}
+
+/* Oscurece la cinta al mostrar el resultado (una sola capa: más liviano que apagar cada casilla) */
+.db-dim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(4, 6, 16, 0.62);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.db-band.landed .db-dim {
+  opacity: 1;
+}
+
+.db-tile.win {
+  z-index: 2;
+  transform: scale(1.13);
+}
+
+.db-tile.win.db-red {
+  box-shadow: 0 0 0 3px #fff, 0 0 26px 6px rgba(241, 44, 76, 0.8);
+}
+
+.db-tile.win.db-black {
+  box-shadow: 0 0 0 3px #fff, 0 0 24px 6px rgba(140, 155, 230, 0.55);
+}
+
+.db-tile.win.db-white {
+  box-shadow: 0 0 0 3px var(--gold), 0 0 34px 10px rgba(255, 197, 61, 0.65);
+}
+
+.db-tile.win::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border-radius: calc(var(--db-r) + 6px);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+  animation: dbRing 1.2s ease-out infinite;
+}
+
+.db-tile.win.db-white::after {
+  border-color: rgba(255, 197, 61, 0.95);
+}
+
+@keyframes dbRing {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+
+/* Marca dorada fija en el centro */
+.db-marker {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #ffc53d, rgba(255, 214, 110, 0.55) 30%, rgba(255, 214, 110, 0.55) 70%, #ffc53d);
+  box-shadow: 0 0 8px rgba(255, 197, 61, 0.7);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.db-marker::before,
+.db-marker::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -9px;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  filter: drop-shadow(0 0 5px rgba(255, 197, 61, 0.8));
+}
+
+.db-marker::before {
+  top: -4px;
+  border-top: 11px solid #ffc53d;
+}
+
+.db-marker::after {
+  bottom: -4px;
+  border-bottom: 11px solid #ffc53d;
+}
+
+/* ───────── Estado: cuenta regresiva / girando / resultado ───────── */
+.db-status {
+  position: relative;
+  height: 66px; /* alto fijo: al cambiar de cuenta regresiva a resultado no salta nada */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 14px;
+  text-align: center;
+}
+
+.db-status > * {
+  display: none;
+}
+
+.db-status.m-bet .db-count,
+.db-status.m-bet .db-bar,
+.db-status.m-spin .db-msg,
+.db-status.m-spin .db-sub,
+.db-status.m-closing .db-msg,
+.db-status.m-closing .db-sub,
+.db-status.m-pause .db-msg,
+.db-status.m-pause .db-sub,
+.db-status.m-wait .db-msg,
+.db-status.m-wait .db-sub,
+.db-status.m-result .db-sub {
+  display: block;
+}
+
+.db-status.m-result .db-banner {
+  display: inline-flex;
+}
+
+.db-status .db-sub:empty {
+  display: none;
+}
+
+.db-count {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #c6cdf0;
+  white-space: nowrap;
+}
+
+.db-secs {
+  display: inline-block;
+  min-width: 3.1em;
+  margin-left: 3px;
+  text-align: left;
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  vertical-align: -1px;
+}
+
+.db-status.hurry .db-secs {
+  color: var(--gold);
+  text-shadow: 0 0 16px rgba(255, 197, 61, 0.6);
+}
+
+.db-bar {
+  width: min(360px, 80%);
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.db-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f12c4c, #ffffff 50%, #6b7294);
+  transform-origin: left center;
+}
+
+.db-status.hurry .db-bar i {
+  background: linear-gradient(90deg, #ff8a3d, #ffc53d);
+}
+
+.db-msg {
+  font-size: 1.2rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.db-status.m-spin .db-msg {
+  color: #fff;
+  text-shadow: 0 0 18px rgba(255, 197, 61, 0.45);
+  animation: dbSpinMsg 0.8s ease-in-out infinite alternate;
+}
+
+.db-status.m-closing .db-msg {
+  color: var(--gold);
+}
+
+@keyframes dbSpinMsg {
+  to {
+    transform: scale(1.06);
+    text-shadow: 0 0 26px rgba(255, 197, 61, 0.75);
+  }
+}
+
+.db-sub {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Cartel del resultado: "Salió ROJO 7" / "¡BLANCO! 30x" */
+.db-banner {
+  align-items: center;
+  gap: 10px;
+  padding: 4px 16px 4px 4px;
+  border-radius: 13px;
+  border: 1px solid transparent;
+  font-size: 1.06rem;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.db-banner b {
+  font-weight: 900;
+}
+
+.db-banner.pop {
+  animation: dbBannerPop 0.55s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+@keyframes dbBannerPop {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+}
+
+.db-banner.db-red {
+  background: linear-gradient(90deg, rgba(241, 44, 76, 0.38), rgba(241, 44, 76, 0.12));
+  border-color: rgba(241, 44, 76, 0.6);
+  box-shadow: 0 0 26px rgba(241, 44, 76, 0.3);
+}
+
+.db-banner.db-black {
+  background: linear-gradient(90deg, rgba(62, 68, 100, 0.8), rgba(38, 42, 61, 0.55));
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 22px rgba(120, 135, 210, 0.18);
+}
+
+.db-banner.db-white {
+  background: linear-gradient(90deg, #ffffff, #eef1fb);
+  border-color: var(--gold);
+  color: #d81d3b;
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.35), 0 0 46px rgba(255, 197, 61, 0.35);
+}
+
+.db-bn-tile {
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.db-bn-tile.db-red {
+  background: linear-gradient(180deg, #ff5a75, #d61e3c);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.db-bn-tile.db-black {
+  background: linear-gradient(180deg, #3b4160, #1d2031);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.db-bn-tile.db-white {
+  background: linear-gradient(180deg, #fff1c7, #ffc53d);
+  color: #d81d3b;
+}
+
+.db-bn-tile .db-star {
+  width: 20px;
+  height: 20px;
+}
+
+/* ───────── Panel: botones de color ───────── */
+.db-colors {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.db-cb {
+  position: relative;
+  min-width: 0;
+  min-height: 78px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: #fff;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform 0.08s ease, filter 0.2s ease, opacity 0.2s ease, box-shadow 0.25s ease;
+}
+
+.db-cb.db-red {
+  background: linear-gradient(180deg, #ff6a82 0%, #f12c4c 55%, #cc1a3a 100%);
+  box-shadow: 0 8px 20px rgba(241, 44, 76, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.38), inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+}
+
+.db-cb.db-white {
+  color: #e0203d;
+  background: linear-gradient(180deg, #ffffff 0%, #eef1fb 60%, #d6dcee 100%);
+  box-shadow: 0 8px 20px rgba(255, 255, 255, 0.14), inset 0 -3px 0 rgba(0, 0, 0, 0.13);
+}
+
+.db-cb.db-black {
+  background: linear-gradient(180deg, #41476a 0%, #2a2e45 55%, #1c1f31 100%);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -3px 0 rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+@media (hover: hover) {
+  .db-cb:not(:disabled):hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+}
+
+.db-cb:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.db-cb:disabled {
+  cursor: default;
+  opacity: 0.42;
+  filter: saturate(0.5) brightness(0.85);
+}
+
+.db-cb:disabled.has {
+  opacity: 0.8;
+  filter: saturate(0.8);
+}
+
+.db-cb.has {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.db-cb.pending {
+  animation: dbPending 0.45s ease-in-out infinite alternate;
+}
+
+@keyframes dbPending {
+  to {
+    filter: brightness(1.25);
+    transform: scale(0.97);
+  }
+}
+
+.db-cb-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+}
+
+.db-cb-main.bump {
+  animation: dbBump 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+@keyframes dbBump {
+  40% {
+    transform: scale(1.14);
+  }
+}
+
+.db-cb-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.db-cb-star .db-star {
+  width: 13px;
+  height: 13px;
+}
+
+.db-cb-sep {
+  display: none;
+}
+
+.db-cb-mult {
+  font-size: 1.45rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.db-cb-mine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.28);
+  line-height: 1.1;
+}
+
+.db-cb.db-white .db-cb-mine {
+  background: rgba(224, 32, 61, 0.1);
+}
+
+.db-cb-mine small {
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.db-cb-mine b {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.74rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* En PC (panel angosto a la izquierda) los tres botones van uno abajo del otro */
+@container gameview (min-width: 620px) {
+  .db-colors {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .db-cb {
+    min-height: 54px;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 14px;
+  }
+
+  .db-cb-main {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 7px;
+  }
+
+  .db-cb-name {
+    font-size: 0.98rem;
+    letter-spacing: 0.04em;
+  }
+
+  .db-cb-sep {
+    display: inline;
+    opacity: 0.6;
+    font-weight: 700;
+  }
+
+  .db-cb-mult {
+    font-size: 1.1rem;
+  }
+
+  .db-cb-mine {
+    align-items: flex-end;
+    min-width: 0;
+  }
+}
+
+/* ───────── Columnas de apuestas (una por color) ───────── */
+.db-bets {
+  grid-area: bets;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.db-bets-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+  padding: 0 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.db-bets-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.db-bets-sum b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.db-cols {
+  container: dbcols / inline-size;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.db-col {
+  min-width: 0;
+  border-radius: 16px;
+  border: 1px solid var(--line-2);
+  background: linear-gradient(180deg, rgba(30, 39, 80, 0.55), rgba(16, 22, 47, 0.92));
+  overflow: hidden;
+  transition: opacity 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+.db-col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.db-col.db-red .db-col-head {
+  background: linear-gradient(180deg, rgba(241, 44, 76, 0.24), rgba(241, 44, 76, 0.05));
+}
+
+.db-col.db-white .db-col-head {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.03));
+}
+
+.db-col.db-black .db-col-head {
+  background: linear-gradient(180deg, rgba(62, 68, 100, 0.55), rgba(38, 42, 61, 0.12));
+}
+
+.db-col-chip {
+  flex: none;
+  min-width: 32px;
+  height: 26px;
+  padding: 0 5px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 0.74rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+.db-col-chip.db-red {
+  background: linear-gradient(180deg, #ff5a75, #d61e3c);
+}
+
+.db-col-chip.db-white {
+  background: #fff;
+  color: #e0203d;
+}
+
+.db-col-chip.db-black {
+  background: linear-gradient(180deg, #3b4160, #1d2031);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.db-col-sum {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.db-col-total {
+  font-size: 0.86rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-col-count {
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.db-col-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.db-col-empty,
+.db-more {
+  padding: 10px 4px;
+  text-align: center;
+  font-size: 0.74rem;
+  color: var(--faint);
+}
+
+.db-more {
+  padding: 4px;
+}
+
+.db-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 6px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.78rem;
+}
+
+.db-row-user {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.db-row-amt {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.db-row.me {
+  background: rgba(61, 123, 255, 0.15);
+  box-shadow: inset 2px 0 0 var(--blue);
+}
+
+.db-row.won .db-row-amt {
+  color: #5ff29a;
+}
+
+.db-row.lost {
+  opacity: 0.55;
+}
+
+/* Jugadores bot: siempre marcados */
+.db-row.db-bot {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.db-row.db-bot .db-row-user {
+  color: #aab2d8;
+  font-weight: 500;
+}
+
+.db-bot-av {
+  filter: grayscale(0.75);
+  opacity: 0.7;
+}
+
+.db-col.win {
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 22px rgba(160, 170, 230, 0.18);
+}
+
+.db-col.db-red.win {
+  border-color: rgba(241, 44, 76, 0.85);
+  box-shadow: 0 0 24px rgba(241, 44, 76, 0.3);
+}
+
+.db-col.db-white.win {
+  border-color: var(--gold);
+  box-shadow: 0 0 26px rgba(255, 197, 61, 0.3);
+}
+
+.db-col.lose {
+  opacity: 0.55;
+}
+
+.db-short {
+  display: none;
+}
+
+@container dbcols (max-width: 559px) {
+  .db-full {
+    display: none;
+  }
+
+  .db-short {
+    display: inline;
+  }
+}
+
+@container dbcols (max-width: 419px) {
+  .db-row .avatar {
+    display: none;
+  }
+
+  .db-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 3px 6px;
+    font-size: 0.74rem;
+  }
+
+  .db-col-head {
+    gap: 6px;
+    padding: 7px;
+  }
+
+  .db-col-chip {
+    min-width: 28px;
+    height: 24px;
+    font-size: 0.68rem;
+  }
+
+  .db-col-total {
+    font-size: 0.78rem;
+  }
+
+  .db-col-list {
+    padding: 5px;
+  }
+}
+
+/* ───────── Mis apuestas ───────── */
+.db-mr-badge {
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.db-mr-badge.db-red {
+  background: linear-gradient(180deg, #ff5a75, #d61e3c);
+}
+
+.db-mr-badge.db-black {
+  background: linear-gradient(180deg, #3b4160, #1d2031);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.db-mr-badge.db-white {
+  background: linear-gradient(180deg, #ffffff, #e3e7f5);
+  color: #e0203d;
+  font-size: 0.66rem;
+}
+
+.db-mr-badge.off {
+  opacity: 0.55;
+  filter: saturate(0.6);
+}
+
+.db-mr-star .db-star {
+  width: 13px;
+  height: 13px;
+}
+
+.db-mine-row .dbl-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .db-hist.new,
+  .db-banner.pop,
+  .db-tile.win::after,
+  .db-status.m-spin .db-msg,
+  .db-cb.pending,
+  .db-cb-main.bump,
+  .db-flash.go {
+    animation: none !important;
+  }
+
+  .db-tile,
+  .db-dim {
+    transition: none;
+  }
+}
