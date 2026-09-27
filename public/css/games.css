@@ -706,6 +706,8 @@
 }
 
 .rn-ball.big {
+  display: grid;
+  width: 68px;
   min-width: 68px;
   height: 68px;
   font-size: 1.7rem;

@@ -4444,12 +4444,6 @@ body.drawer-open {
   gap: 8px;
 }
 
-@media (min-width: 560px) {
-  .arl-sum {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
 .arl-sum-box {
   border-radius: 12px;
   padding: 8px 10px;
