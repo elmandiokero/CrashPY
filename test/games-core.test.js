@@ -120,6 +120,24 @@ test('🎰 Ruleta europea: cada tipo de apuesta paga lo justo (retorno 97,3%)', 
   // Con 1 ficha en cada número siempre cobrás 36
   const all = Array.from({ length: 37 }, (_, n) => ({ type: 'n', value: n, amount: 1000 }));
   for (let n = 0; n <= 36; n++) assert.equal(core.roulettePayout(all, n), 36_000);
+  assert.equal(core.rouletteMaxPayout(all), 36_000);
+  assert.equal(core.rouletteMaxPayout([{ type: 'red', amount: 1000 }, { type: 'n', value: 3, amount: 1000 }]), 38_000);
+  assert.equal(core.rouletteMaxPayout([{ type: 'red', amount: 1000 }, { type: 'black', amount: 1000 }]), 2_000);
+});
+
+test('🎰 Ruleta en vivo: el número sale del hash de la ronda y todos tienen la misma chance', () => {
+  const seen = new Array(37).fill(0);
+  let h = 'ruleta';
+  for (let i = 0; i < 74_000; i++) {
+    h = crypto.createHash('sha256').update(h).digest('hex');
+    const n = core.rouletteNumberFromHmac(crypto.createHmac('sha256', 'sal').update(h).digest('hex'));
+    assert.ok(Number.isInteger(n) && n >= 0 && n <= 36);
+    seen[n]++;
+  }
+  for (const c of seen) assert.ok(Math.abs(c / 74_000 - 1 / 37) < 0.005);
+  // Mismo cálculo que el del Double y el Crash: primeros 52 bits del HMAC
+  assert.equal(core.rouletteNumberFromHmac('0000000000000' + 'f'.repeat(51)), 0);
+  assert.equal(core.rouletteNumberFromHmac('fffffffffffff' + '0'.repeat(51)), 36);
 });
 
 test('🎡 Double: 15 rojas, 15 negras y 1 blanca, retorno 96,8% en cada color', () => {

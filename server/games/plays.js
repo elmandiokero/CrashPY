@@ -5,9 +5,7 @@ const { AppError, fmtGs, fmtMult, parseAmount } = require('../util');
 
 const hmacBytes = (key, message) => crypto.createHmac('sha256', key).update(message).digest();
 
-const GAME_NAMES = { mines: 'Minas', penalty: 'Penales', plinko: 'Plinko', roulette: 'Ruleta' };
-const ROULETTE_TYPES = new Set(['n', 'red', 'black', 'odd', 'even', 'low', 'high', 'dozen', 'column']);
-const MAX_ROULETTE_BETS = 60;
+const GAME_NAMES = { mines: 'Minas', penalty: 'Penales', plinko: 'Plinko' };
 
 const parseJSON = (s, def) => {
   try {
@@ -19,7 +17,7 @@ const parseJSON = (s, def) => {
 
 /**
  * Juegos individuales: cada jugada se decide con las semillas del jugador (provably fair).
- * Minas y Penales tienen varias jugadas dentro de la misma partida; Plinko y Ruleta son instantáneos.
+ * Minas y Penales tienen varias jugadas dentro de la misma partida; Plinko es instantáneo.
  */
 class PlayEngine {
   constructor({ db, wallet, settings, bus, seeds }) {
@@ -133,7 +131,7 @@ class PlayEngine {
       }
     });
     const done = this._load(play.id);
-    // Plinko y Ruleta cierran la jugada dentro de otra transacción: avisamos recién cuando se confirma.
+    // Plinko cierra la jugada dentro de otra transacción: avisamos recién cuando se confirma.
     this.db.onCommit(() => this._announce(done));
     return done;
   }
@@ -203,8 +201,6 @@ class PlayEngine {
     } else if (p.game === 'plinko') {
       out.path = p.result.path;
       out.bucket = p.result.bucket;
-    } else if (p.game === 'roulette') {
-      out.number = p.result.number;
     }
     return out;
   }
@@ -323,46 +319,6 @@ class PlayEngine {
         return { path: r.path, bucket: r.bucket, multiplier: r.multiplier };
       });
       return this.publicPlay(this._finish(play, { multiplier: play.result.multiplier }));
-    });
-  }
-
-  // ───────────────────────── 🎰 Ruleta ─────────────────────────
-
-  _rouletteBets(raw) {
-    if (!Array.isArray(raw) || !raw.length) throw new AppError('Poné al menos una ficha en la mesa');
-    if (raw.length > MAX_ROULETTE_BETS) throw new AppError('Demasiadas apuestas en una sola jugada');
-    const merged = new Map();
-    for (const b of raw) {
-      const type = String(b && b.type);
-      if (!ROULETTE_TYPES.has(type)) throw new AppError('Apuesta inválida');
-      let value = null;
-      if (type === 'n') {
-        value = Number(b.value);
-        if (!Number.isInteger(value) || value < 0 || value > 36) throw new AppError('Número inválido');
-      } else if (type === 'dozen' || type === 'column') {
-        value = Number(b.value);
-        if (![1, 2, 3].includes(value)) throw new AppError('Apuesta inválida');
-      }
-      const amount = parseAmount(b.amount);
-      if (!Number.isSafeInteger(amount) || amount <= 0) throw new AppError('Monto de ficha inválido');
-      const key = `${type}:${value}`;
-      const prev = merged.get(key);
-      if (prev) prev.amount += amount;
-      else merged.set(key, { type, value, amount });
-    }
-    return [...merged.values()];
-  }
-
-  rouletteSpin(userId, data = {}) {
-    this._checkGame('roulette');
-    this._checkUser(userId);
-    const bets = this._rouletteBets(data.bets);
-    const total = bets.reduce((s, b) => s + b.amount, 0);
-    this._amount(total);
-    return this.db.tx(() => {
-      const play = this._create(userId, 'roulette', total, { bets }, (seed) => ({ number: core.rouletteNumber(this.floats(seed, 1)) }));
-      const payout = core.roulettePayout(bets, play.result.number);
-      return this.publicPlay(this._finish(play, { payout }));
     });
   }
 

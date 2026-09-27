@@ -14,9 +14,16 @@ test.before(async () => {
   srv = await startServer();
   admin = new Client(srv.url);
   assert.equal((await admin.post('/api/auth/login', { username: 'admin', password: 'admin123' })).status, 200);
-  let r = await admin.post('/api/admin/settings', { betting_seconds: 3, speed: 2, double_betting_seconds: 5, game_double: false });
+  let r = await admin.post('/api/admin/settings', {
+    betting_seconds: 3,
+    speed: 2,
+    double_betting_seconds: 5,
+    roulette_betting_seconds: 5,
+    game_double: false,
+    game_roulette: false,
+  });
   assert.equal(r.status, 200, JSON.stringify(r.data));
-  r = await admin.post('/api/admin/settings', { game_double: true });
+  r = await admin.post('/api/admin/settings', { game_double: true, game_roulette: true });
   assert.equal(r.status, 200);
   const c = new Client(srv.url);
   const reg = await c.post('/api/auth/register', { username: 'humano', password: 'secret1', adult: true });
@@ -32,7 +39,7 @@ test.after(async () => {
   if (srv) await srv.stop();
 });
 
-test('con los bots prendidos aparecen marcados en el Crash, el Double, las jugadas en vivo y el chat', async () => {
+test('con los bots prendidos aparecen marcados en el Crash, el Double, la Ruleta, las jugadas en vivo y el chat', async () => {
   const s = player.s;
   const adminSock = require('socket.io-client').io(srv.url + '/admin', {
     transports: ['websocket'],
@@ -58,10 +65,17 @@ test('con los bots prendidos aparecen marcados en el Crash, el Double, las jugad
   assert.ok(dbl.user.startsWith('🤖 '));
   assert.ok(['red', 'black', 'white'].includes(dbl.color));
 
+  // En la Ruleta en vivo apuestan en la misma ronda que todos, con fichas válidas
+  const seenRl = player.s.events.find((e) => e.name === 'roulette:bet' && e.data.bot);
+  const rl = seenRl ? seenRl.data : await s.waitFor('roulette:bet', (b) => b.bot, 40000);
+  assert.ok(rl.user.startsWith('🤖 '));
+  assert.ok(rl.bets.length > 0 && rl.bets.every((x) => x.amount > 0));
+  assert.equal(rl.amount, rl.bets.reduce((t, x) => t + x.amount, 0));
+
   const feed = await s.waitFor('feed', (batch) => batch.some((f) => f.bot), 30000);
   const item = feed.find((f) => f.bot);
   assert.ok(item.user.startsWith('🤖 '));
-  assert.ok(['mines', 'penalty', 'plinko', 'roulette'].includes(item.game));
+  assert.ok(['mines', 'penalty', 'plinko'].includes(item.game));
 
   // Al entrar, uno de los bots saluda (puede haber llegado antes: se busca también en lo ya recibido)
   const seen = player.s.events.find((e) => e.name === 'chat' && e.data.role === 'bot');
@@ -72,7 +86,7 @@ test('con los bots prendidos aparecen marcados en el Crash, el Double, las jugad
   // Alguien que entra ahora ve las apuestas de los bots de la ronda (marcadas)
   const s2 = connectSocket(srv.url, player.c.cookie);
   const snap = await s2.ready;
-  for (const b of [...snap.game.bets, ...snap.double.bets].filter((x) => x.bot)) assert.ok(b.user.startsWith('🤖 '));
+  for (const b of [...snap.game.bets, ...snap.double.bets, ...snap.roulette.bets].filter((x) => x.bot)) assert.ok(b.user.startsWith('🤖 '));
   s2.close();
 
   await sleep(1500);
@@ -86,6 +100,7 @@ test('los bots no tocan la plata ni las estadísticas reales, y sus resultados s
   // Nada de los bots en las tablas reales
   assert.equal(db.prepare('SELECT COUNT(*) AS c FROM bets').get().c, 0);
   assert.equal(db.prepare('SELECT COUNT(*) AS c FROM double_bets').get().c, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM roulette_bets').get().c, 0);
   assert.equal(db.prepare('SELECT COUNT(*) AS c FROM plays').get().c, 0);
   assert.equal(db.prepare("SELECT COUNT(*) AS c FROM ledger WHERE type IN ('bet', 'win', 'refund')").get().c, 0);
   assert.equal(db.prepare('SELECT balance FROM users WHERE id = ?').get(player.id).balance, 100_000);

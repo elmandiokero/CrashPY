@@ -567,6 +567,7 @@ function connect() {
   adminSock.on('presence', (p) => bus.emit('presence', p));
   adminSock.on('roundEnd', (d) => bus.emit('roundEnd', d));
   adminSock.on('doubleEnd', (d) => bus.emit('doubleEnd', d));
+  adminSock.on('rouletteEnd', (d) => bus.emit('rouletteEnd', d));
   adminSock.on('feed', (batch) => {
     if (!Array.isArray(batch)) return;
     for (const f of batch) state.feed.unshift(f);

@@ -4175,29 +4175,21 @@ body.drawer-open {
   margin-bottom: 16px;
 }
 
-.gm-grid > .acard {
+.gm-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.gm-col > .acard {
   margin: 0;
 }
 
 @media (min-width: 1100px) {
   .gm-grid {
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-    grid-template-areas:
-      'st db'
-      'st fd';
     align-items: start;
-  }
-
-  .gm-grid > .gm-status {
-    grid-area: st;
-  }
-
-  .gm-grid > .gm-double {
-    grid-area: db;
-  }
-
-  .gm-grid > .gm-feed-card {
-    grid-area: fd;
   }
 }
 
@@ -4445,6 +4437,115 @@ body.drawer-open {
   opacity: 0.6;
 }
 
+/* Ruleta en vivo */
+.arl-sum {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 560px) {
+  .arl-sum {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.arl-sum-box {
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.arl-sum-box small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arl-sum-box b {
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arl-sum-box .arl-sum-sub {
+  font-size: 0.7rem;
+  color: var(--faint, var(--muted));
+}
+
+.arl-heat {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 3px;
+}
+
+.arl-heat-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.arl-cell {
+  display: grid;
+  place-items: center;
+  min-height: 24px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-bottom: 3px solid #4a5070;
+  cursor: default;
+}
+
+.arl-cell.arl-c-red {
+  border-bottom-color: #f12c4c;
+}
+
+.arl-cell.arl-c-green {
+  border-bottom-color: #0f9d58;
+}
+
+.arl-cell.zero {
+  grid-row: span 1;
+  min-height: 100%;
+}
+
+.arl-cell.on {
+  outline: 2px solid var(--gold, #ffc53d);
+  outline-offset: 1px;
+}
+
+.dbl-pill.arl-pill {
+  border-radius: 50%;
+}
+
+.dbl-pill.arl-pill.green {
+  background: #0f9d58;
+}
+
+.arl-bet {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) auto auto;
+}
+
+.arl-bet-spots {
+  color: var(--muted);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Jugadas en vivo */
 .gm-feed {
   display: flex;
@@ -4536,6 +4637,20 @@ body.drawer-open {
 
 .gm-visual {
   margin: 12px 0;
+}
+
+.gm-detail .kvs + .kvs,
+.gm-detail .gm-visual + .kvs {
+  margin-top: 12px;
+}
+
+.gm-detail .gm-detail-fair {
+  margin-bottom: 12px;
+}
+
+.gm-detail .kv-v.mono {
+  font-size: 0.78rem;
+  font-weight: 500;
 }
 
 /* Dibujos del detalle de jugadas (mismos que en el juego) */

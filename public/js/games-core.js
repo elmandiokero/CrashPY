@@ -1,12 +1,15 @@
 /*
  * Núcleo matemático de los juegos (se usa igual en el servidor y en el navegador).
  *
- * PROVABLY FAIR con semillas (Minas, Penales, Plinko, Ruleta):
+ * PROVABLY FAIR con semillas (Minas, Penales, Plinko):
  *   - semilla del servidor (secreta; antes se muestra su SHA-256)
  *   - semilla del cliente (la podés cambiar vos)
  *   - nonce (número de jugada con ese par de semillas)
  *   Números aleatorios: HMAC_SHA256(clave = semilla servidor, mensaje = "semillaCliente:nonce:ronda")
  *   cada 4 bytes forman un número entre 0 y 1.
+ *
+ * El Double y la Ruleta son en vivo: cada ronda sale de una cadena de hashes publicada de antemano
+ * (igual que el Crash) con HMAC_SHA256(clave = sal, mensaje = hash de la ronda).
  *
  * Todos los multiplicadores están en centésimas (250 = 2.50x).
  */
@@ -120,9 +123,12 @@
   // Orden real de los números en la rueda europea
   const ROULETTE_WHEEL = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
   const ROULETTE_PAYS = { n: 3600, red: 200, black: 200, odd: 200, even: 200, low: 200, high: 200, dozen: 300, column: 300 };
+  const ROULETTE_NUMBERS = 37;
 
-  function rouletteNumber(floats) {
-    return Math.floor(floats[0] * 37);
+  /** Número ganador de una ronda en vivo a partir del HMAC (hex): primeros 52 bits → 0 a 36. */
+  function rouletteNumberFromHmac(hmacHex) {
+    const r = parseInt(hmacHex.slice(0, 13), 16);
+    return Math.floor((r / 4503599627370496) * ROULETTE_NUMBERS);
   }
 
   function rouletteColor(n) {
@@ -163,6 +169,13 @@
     return total;
   }
 
+  /** Lo máximo que puede cobrar esa lista de apuestas (según el número que salga). */
+  function rouletteMaxPayout(bets) {
+    let best = 0;
+    for (let n = 0; n < ROULETTE_NUMBERS; n++) best = Math.max(best, roulettePayout(bets, n));
+    return best;
+  }
+
   // ───────── 🎡 Double (31 casillas: 1 blanca, 15 rojas, 15 negras) ─────────
 
   const DOUBLE_TILES = 31;
@@ -197,10 +210,12 @@
     ROULETTE_RED,
     ROULETTE_WHEEL,
     ROULETTE_PAYS,
-    rouletteNumber,
+    ROULETTE_NUMBERS,
+    rouletteNumberFromHmac,
     rouletteColor,
     rouletteWins,
     roulettePayout,
+    rouletteMaxPayout,
     DOUBLE_TILES,
     DOUBLE_PAYS,
     doubleTileFromHmac,

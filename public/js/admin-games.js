@@ -1,5 +1,5 @@
-// Juegos: prender/pausar cada juego, Double en vivo, jugadas en vivo e historial de jugadas de todos.
-import { h, fmtGs, fmtNum, fmtMult, fmtDate, fmtTime, toast, confirmDialog, openModal } from './shared.js';
+// Juegos: prender/pausar cada juego, Double y Ruleta en vivo, jugadas en vivo e historial de jugadas de todos.
+import { h, fmtGs, fmtNum, fmtMult, fmtSigned, fmtDate, fmtTime, toast, confirmDialog, openModal } from './shared.js';
 import {
   state,
   call,
@@ -28,7 +28,7 @@ import {
   GAME_ORDER,
 } from './admin-core.js';
 import { pauseState, togglePause } from './admin-live.js';
-import { core, playVisual, DOUBLE_COLORS } from './games/common.js';
+import { core, playVisual, DOUBLE_COLORS, ROULETTE_EMOJI, ROULETTE_COLOR_NAMES, rouletteBetsLabel } from './games/common.js';
 
 const COLOR_EMOJI = { red: '🔴', black: '⚫', white: '⚪' };
 const PERIODS = [
@@ -45,7 +45,7 @@ function gameStatus(id) {
     const s = pauseState();
     return s === 'running' ? ['on', 'Activo'] : s === 'paused' ? ['off', 'Pausado'] : ['warn', 'Se pausa al terminar la ronda'];
   }
-  if (id === 'double' && state.settings.game_double !== false && state.stats?.double?.phase === 'PAUSED') return ['warn', 'Arrancando…'];
+  if ((id === 'double' || id === 'roulette') && state.settings[`game_${id}`] !== false && state.stats?.[id]?.phase === 'PAUSED') return ['warn', 'Arrancando…'];
   return state.settings[`game_${id}`] === false ? ['off', 'Pausado'] : ['on', 'Activo'];
 }
 
@@ -54,7 +54,7 @@ async function setEnabled(id, on) {
   if (id === 'crash') return togglePause();
   if (!on) {
     const msg =
-      id === 'double'
+      id === 'double' || id === 'roulette'
         ? 'Si hay apuestas en la ronda actual se devuelven. Si la rueda está girando, la ronda termina normal y después se pausa.'
         : id === 'mines' || id === 'penalty'
           ? 'Nadie va a poder empezar partidas nuevas. Las partidas que ya están en curso se pueden terminar.'
@@ -165,7 +165,7 @@ function doubleCard() {
           h('div', { class: 'dbl-col-head' }, h('span', { class: `dbl-dot ${c}` }), DOUBLE_COLORS[c], h('small', null, c === 'white' ? '30x' : '2x')),
           h('b', { class: 'dbl-amount' }, fmtGs(t.amount)),
           h('small', null, plural(t.players, 'jugador', 'jugadores')),
-          h('div', { class: 'dbl-if' }, 'Si sale: ', h('span', { class: `num ${signClass(house)}` }, (house > 0 ? '+' : '') + fmtGs(house))),
+          h('div', { class: 'dbl-if' }, 'Si sale: ', h('span', { class: `num ${signClass(house)}` }, fmtSigned(house))),
         );
       }),
     );
@@ -188,6 +188,97 @@ function doubleCard() {
             ),
           )
         : [emptyState('Nadie apostó en esta ronda todavía', '🎡')]),
+    );
+  };
+  render();
+  return { el, render };
+}
+
+// ───────────────────────── Ruleta en vivo ─────────────────────────
+
+// Mesa de la ruleta: fila de arriba 3, 6, … 36; la del medio 2, 5, … 35; la de abajo 1, 4, … 34
+const TABLE_ROWS = [3, 2, 1].map((r) => Array.from({ length: 12 }, (_, c) => c * 3 + r));
+
+function rouletteCard() {
+  const phase = h('span', { class: 'chip' });
+  const round = h('span', { class: 'acard-sub' });
+  const summary = h('div', { class: 'arl-sum' });
+  const table = h('div', { class: 'arl-heat', role: 'img', 'aria-label': 'Resultado de la casa según el número que salga' });
+  const hist = h('div', { class: 'dbl-hist' });
+  const bets = h('div', { class: 'dbl-bets' });
+  const el = card(
+    '🎰 Ruleta en vivo',
+    { cls: 'gm-roulette', actions: h('div', { class: 'dbl-head' }, round, phase) },
+    summary,
+    h('div', { class: 'dbl-sub' }, 'Si sale cada número, la casa…'),
+    table,
+    h('div', { class: 'dbl-sub' }, 'Últimos números'),
+    hist,
+    bets,
+  );
+  let key = '';
+  const cell = (n, d) => {
+    const house = d.houseIf ? d.houseIf[n] : 0;
+    const scale = Math.max(1, ...(d.houseIf || []).map(Math.abs));
+    const k = house ? Math.min(1, Math.abs(house) / scale) : 0;
+    const bg = house > 0 ? `rgba(43, 217, 107, ${0.12 + 0.5 * k})` : house < 0 ? `rgba(241, 44, 76, ${0.15 + 0.6 * k})` : '';
+    const on = d.lastResult === n;
+    return h(
+      'span',
+      {
+        class: `arl-cell arl-c-${core.rouletteColor(n)}${on ? ' on' : ''}${n === 0 ? ' zero' : ''}`,
+        style: bg ? { background: bg } : null,
+        title: house >= 0 ? `Si sale el ${n}: la casa gana ${fmtGs(house)}` : `Si sale el ${n}: la casa pierde ${fmtGs(-house)}`,
+      },
+      String(n),
+    );
+  };
+  const render = () => {
+    const d = state.stats && state.stats.roulette;
+    if (!d) {
+      summary.replaceChildren(loadingState());
+      return;
+    }
+    const k = JSON.stringify([d.phase, d.roundId, Math.ceil((d.bettingLeft || 0) / 1000), d.total, d.houseIf, d.lastResult, d.history && d.history[0], d.bets.length]);
+    if (k === key) return;
+    key = k;
+    setText(round, d.roundId ? `Ronda #${d.roundId}` : '');
+    const last = d.lastResult;
+    const phases = {
+      BETTING: ['chip-green', `Apostando · ${Math.ceil((d.bettingLeft || 0) / 1000)} s`],
+      SPINNING: ['chip-gold', 'Girando'],
+      RESULT: ['chip-blue', last !== null ? `Salió ${ROULETTE_EMOJI[core.rouletteColor(last)]} ${last}` : 'Resultado'],
+      PAUSED: ['chip-red', 'Pausada'],
+      IDLE: ['chip', '—'],
+    };
+    const [pc, pt] = phases[d.phase] || ['chip', d.phase];
+    phase.className = `chip ${pc}`;
+    phase.textContent = pt;
+    const box = (label, value, sub) => h('div', { class: 'arl-sum-box' }, h('small', null, label), value, sub ? h('small', { class: 'arl-sum-sub' }, sub) : null);
+    const house = (v) => h('b', { class: `num ${signClass(v)}` }, fmtSigned(v));
+    summary.replaceChildren(
+      box('Apostado', h('b', null, fmtGs(d.total))),
+      box('Jugadores', h('b', null, fmtNum(d.players))),
+      box('Peor caso', d.total ? house(d.worst.house) : h('b', null, '—'), d.total ? `si sale el ${d.worst.n}` : null),
+      box('Mejor caso', d.total ? house(d.best.house) : h('b', null, '—'), d.total ? `si sale el ${d.best.n}` : null),
+    );
+    table.replaceChildren(cell(0, d), h('div', { class: 'arl-heat-grid' }, ...TABLE_ROWS.flat().map((n) => cell(n, d))));
+    hist.replaceChildren(
+      ...(d.history || []).map((r) => h('span', { class: `dbl-pill arl-pill ${core.rouletteColor(r.result)}`, title: `Ronda #${r.id}` }, String(r.result))),
+    );
+    bets.replaceChildren(
+      ...(d.bets.length
+        ? d.bets.slice(0, 12).map((b) =>
+            h(
+              'div',
+              { class: `dbl-bet arl-bet ${b.status}` },
+              userLink(b.uid, b.user, { withAvatar: false }),
+              h('span', { class: 'arl-bet-spots', title: rouletteBetsLabel(b.bets, 20) }, rouletteBetsLabel(b.bets, 2)),
+              h('span', { class: 'num' }, fmtGs(b.amount)),
+              b.status === 'won' || b.status === 'lost' ? signedMoney(b.payout - b.amount) : h('span', { class: 'faint' }, '…'),
+            ),
+          )
+        : [emptyState('Nadie apostó en esta ronda todavía', '🎰')]),
     );
   };
   render();
@@ -235,41 +326,59 @@ function feedCard() {
 
 // ───────────────────────── Detalle de una jugada ─────────────────────────
 
+/** Fila "dato: valor" con el estilo del panel. */
+const kv = (label, value, { mono = false } = {}) =>
+  h('div', { class: 'kv' }, h('span', { class: 'kv-k' }, label), h('span', { class: `kv-v${mono ? ' mono' : ''}` }, value));
+
 async function openDetail(p) {
   const meta = GAME_META[p.game] || GAME_META.crash;
-  const body = h('div', null, loadingState());
-  openModal({ title: `${meta.icon} ${meta.name} · ${p.game === 'double' ? `ronda #${p.round_id}` : `jugada #${p.id}`}`, content: body, wide: true });
+  const live = p.game === 'double' || p.game === 'roulette';
+  const body = h('div', { class: 'gm-detail' }, loadingState());
+  openModal({ title: `${meta.icon} ${meta.name} · ${live ? `ronda #${p.round_id}` : `jugada #${p.id}`}`, content: body, wide: true });
   const summary = h(
-    'dl',
-    { class: 'kv' },
-    h('dt', null, 'Jugador'),
-    h('dd', null, userLink(p.user_id, p.username)),
-    h('dt', null, 'Apuesta'),
-    h('dd', null, fmtGs(p.amount)),
-    h('dt', null, 'Resultado'),
-    h('dd', null, p.status === 'active' ? 'En curso' : p.status === 'refunded' ? 'Devuelta' : signedMoney(p.payout - p.amount), p.status === 'won' ? ` (${fmtMult(p.multiplier)})` : ''),
-    h('dt', null, 'Detalle'),
-    h('dd', null, p.detail),
-    h('dt', null, 'Fecha'),
-    h('dd', null, fmtDate(p.created_at)),
+    'div',
+    { class: 'kvs' },
+    kv('Jugador', userLink(p.user_id, p.username)),
+    kv('Apuesta', fmtGs(p.amount)),
+    kv(
+      'Resultado',
+      h(
+        'span',
+        null,
+        p.status === 'active' ? 'En curso' : p.status === 'refunded' ? 'Devuelta' : signedMoney(p.payout - p.amount),
+        p.status === 'won' ? ` (${fmtMult(p.multiplier)})` : '',
+      ),
+    ),
+    kv('Detalle', p.detail || '—'),
+    kv('Fecha', fmtDate(p.created_at)),
   );
+  const verifyLink = (game, hash, salt) =>
+    h('a', { class: 'btn btn-ghost btn-sm', href: `/fair?game=${game}&hash=${hash}&salt=${salt}`, target: '_blank', rel: 'noopener' }, icon('external', 15), 'Verificar');
   try {
-    if (p.game === 'double') {
-      const d = await call(`/api/double/rounds/${p.round_id}`);
+    if (live) {
+      const d = await call(`/api/${p.game}/rounds/${p.round_id}`);
       const r = d.round;
-      const extra = r.hash
-        ? h(
-            'dl',
-            { class: 'kv' },
-            h('dt', null, 'Salió'),
-            h('dd', null, `${COLOR_EMOJI[core.doubleColor(r.result)]} ${r.result} (${DOUBLE_COLORS[core.doubleColor(r.result)]})`),
-            h('dt', null, 'Hash'),
-            h('dd', { class: 'mono' }, r.hash),
-            h('dt', null, 'Sal'),
-            h('dd', { class: 'mono' }, d.chain.salt),
-          )
-        : h('p', { class: 'hint' }, 'La ronda todavía no giró.');
-      body.replaceChildren(summary, extra, r.hash ? h('a', { class: 'btn btn-ghost btn-sm', href: `/fair?game=double&hash=${r.hash}&salt=${d.chain.salt}`, target: '_blank', rel: 'noopener' }, icon('external', 15), 'Verificar') : '');
+      if (!r.hash) {
+        body.replaceChildren(summary, h('p', { class: 'hint' }, 'La ronda todavía no giró: el resultado se muestra recién cuando gira.'));
+        return;
+      }
+      let shown;
+      let visual = null;
+      if (p.game === 'double') {
+        const c = core.doubleColor(r.result);
+        shown = `${COLOR_EMOJI[c]} ${r.result} (${DOUBLE_COLORS[c]})`;
+      } else {
+        const c = core.rouletteColor(r.result);
+        shown = `${ROULETTE_EMOJI[c]} ${r.result} (${ROULETTE_COLOR_NAMES[c]})`;
+        const mine = (d.bets || []).find((b) => b.id === p.id);
+        if (mine) visual = h('div', { class: 'gm-visual' }, playVisual({ game: 'roulette', result: r.result, bets: mine.bets }));
+      }
+      body.replaceChildren(
+        summary,
+        visual || '',
+        h('div', { class: 'kvs kvs-soft gm-detail-fair' }, kv('Salió', shown), kv('Hash', r.hash, { mono: true }), kv('Sal', d.chain.salt, { mono: true })),
+        verifyLink(p.game, r.hash, d.chain.salt),
+      );
       return;
     }
     if (p.status === 'active') {
@@ -282,16 +391,12 @@ async function openDetail(p) {
       summary,
       h('div', { class: 'gm-visual' }, playVisual(d.play)),
       h(
-        'dl',
-        { class: 'kv' },
-        h('dt', null, 'Semilla servidor'),
-        h('dd', { class: 'mono' }, s.revealed ? s.serverSeed : '🔒 Todavía en uso (se revela cuando el jugador cambie sus semillas)'),
-        h('dt', null, 'Hash servidor'),
-        h('dd', { class: 'mono' }, s.serverHash),
-        h('dt', null, 'Semilla cliente'),
-        h('dd', { class: 'mono' }, s.clientSeed),
-        h('dt', null, 'Nonce'),
-        h('dd', null, String(d.play.nonce)),
+        'div',
+        { class: 'kvs kvs-soft gm-detail-fair' },
+        kv('Semilla servidor', s.revealed ? s.serverSeed : '🔒 Todavía en uso (se revela cuando el jugador cambie sus semillas)', { mono: s.revealed }),
+        kv('Hash servidor', s.serverHash, { mono: true }),
+        kv('Semilla cliente', s.clientSeed, { mono: true }),
+        kv('Nonce', String(d.play.nonce)),
       ),
       h('a', { class: 'btn btn-ghost btn-sm', href: `/fair?game=${p.game}&play=${p.id}`, target: '_blank', rel: 'noopener' }, icon('external', 15), 'Abrir en la página de verificación'),
     );
@@ -310,7 +415,8 @@ const PLAY_COLS = [
     main: true,
     render: (p) => {
       const meta = GAME_META[p.game] || GAME_META.crash;
-      return h('div', { class: 'gm-play-main' }, h('span', { class: 'gm-play-ic' }, meta.icon), h('div', null, h('b', null, `${meta.name} ${p.game === 'double' ? `· ronda #${p.round_id}` : `#${p.id}`}`), h('small', null, fmtDate(p.created_at))));
+      const live = p.game === 'double' || p.game === 'roulette';
+      return h('div', { class: 'gm-play-main' }, h('span', { class: 'gm-play-ic' }, meta.icon), h('div', null, h('b', null, `${meta.name} ${live ? `· ronda #${p.round_id}` : `#${p.id}`}`), h('small', null, fmtDate(p.created_at))));
     },
   },
   { label: 'Jugador', render: (p) => userLink(p.user_id, p.username) },
@@ -406,6 +512,7 @@ export const gamesView = {
     this.sc = sc;
     const status = statusCard(() => this.overview);
     const dbl = doubleCard();
+    const rl = rouletteCard();
     const feed = feedCard();
     const history = playsCard(this.seq);
     const loadOverview = async () => {
@@ -418,6 +525,7 @@ export const gamesView = {
     };
     sc.on('stats', () => {
       dbl.render();
+      rl.render();
       status.render();
     });
     sc.on('settings', () => status.render());
@@ -427,13 +535,14 @@ export const gamesView = {
     el.append(
       viewHead(
         'Juegos',
-        'Prendé o pausá cada juego, mirá el Double en vivo y todas las jugadas.',
+        'Prendé o pausá cada juego, mirá el Double y la Ruleta en vivo y todas las jugadas.',
         refreshBtn(async () => {
           await loadOverview();
           await history.load();
         }),
       ),
-      h('div', { class: 'gm-grid' }, status.el, dbl.el, feed.el),
+      // Dos columnas independientes en la PC (así no quedan huecos); en el celular, una debajo de la otra
+      h('div', { class: 'gm-grid' }, h('div', { class: 'gm-col' }, status.el, rl.el), h('div', { class: 'gm-col' }, dbl.el, feed.el)),
       history.el,
     );
     loadOverview();

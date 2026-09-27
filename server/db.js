@@ -186,7 +186,7 @@ CREATE TABLE IF NOT EXISTS audit (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit(created_at);
 
--- Semillas provably fair de cada jugador (Minas, Penales, Plinko, Ruleta)
+-- Semillas provably fair de cada jugador (Minas, Penales, Plinko)
 CREATE TABLE IF NOT EXISTS seeds (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id),
@@ -200,7 +200,7 @@ CREATE TABLE IF NOT EXISTS seeds (
 );
 CREATE INDEX IF NOT EXISTS idx_seeds_user ON seeds(user_id, active);
 
--- Jugadas individuales (Minas, Penales, Plinko, Ruleta)
+-- Jugadas individuales (Minas, Penales, Plinko)
 CREATE TABLE IF NOT EXISTS plays (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id),
@@ -253,6 +253,39 @@ CREATE TABLE IF NOT EXISTS double_bets (
 );
 CREATE INDEX IF NOT EXISTS idx_double_bets_round ON double_bets(round_id);
 CREATE INDEX IF NOT EXISTS idx_double_bets_user ON double_bets(user_id, id);
+
+-- Ruleta en vivo (una bolita para todos; cada jugador tiene una apuesta por ronda con todas sus fichas)
+CREATE TABLE IF NOT EXISTS roulette_rounds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chain_id INTEGER NOT NULL REFERENCES chains(id),
+  chain_index INTEGER NOT NULL,
+  hash TEXT NOT NULL,
+  result INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  spun_at INTEGER,
+  ended_at INTEGER,
+  total_bet INTEGER NOT NULL DEFAULT 0,
+  total_payout INTEGER NOT NULL DEFAULT 0,
+  total_refund INTEGER NOT NULL DEFAULT 0,
+  players INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (chain_id, chain_index)
+);
+CREATE INDEX IF NOT EXISTS idx_roulette_rounds_status ON roulette_rounds(status);
+CREATE INDEX IF NOT EXISTS idx_roulette_rounds_ended ON roulette_rounds(ended_at);
+
+CREATE TABLE IF NOT EXISTS roulette_bets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  round_id INTEGER NOT NULL REFERENCES roulette_rounds(id),
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  bets TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  payout INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_roulette_bets_round ON roulette_bets(round_id);
+CREATE INDEX IF NOT EXISTS idx_roulette_bets_user ON roulette_bets(user_id, id);
 
 -- Resultados de los bots (plata ficticia): separados de todo lo real
 CREATE TABLE IF NOT EXISTS bot_stats (

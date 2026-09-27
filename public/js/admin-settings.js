@@ -28,7 +28,7 @@ const GROUPS = [
   {
     title: 'Juegos',
     icon: 'gamepad',
-    keys: ['game_mines', 'game_penalty', 'game_double', 'game_plinko', 'game_roulette', 'betting_seconds', 'speed', 'double_betting_seconds'],
+    keys: ['game_mines', 'game_penalty', 'game_double', 'game_plinko', 'game_roulette', 'betting_seconds', 'speed', 'double_betting_seconds', 'roulette_betting_seconds'],
   },
   {
     title: 'Depósitos y retiros',
@@ -41,7 +41,7 @@ const GROUPS = [
 
 const MONEY = new Set(['min_bet', 'max_bet', 'max_profit', 'min_deposit', 'min_withdraw', 'max_withdraw', 'bigwin_amount', 'signup_bonus', 'bots_max_bet']);
 const TEXTAREA = new Set(['bank_notes', 'banner']);
-const SUFFIX = { betting_seconds: 'seg.', double_betting_seconds: 'seg.', speed: 'x', bigwin_multiplier: 'x' };
+const SUFFIX = { betting_seconds: 'seg.', double_betting_seconds: 'seg.', roulette_betting_seconds: 'seg.', speed: 'x', bigwin_multiplier: 'x' };
 const PLACEHOLDER = {
   quick_amounts: '2000,5000,10000,50000',
   bank_name: 'Ej: Banco Itaú',
@@ -54,9 +54,9 @@ const PLACEHOLDER = {
 };
 
 const HINTS = {
-  min_bet: 'Monto mínimo por apuesta (en la Ruleta, el total de fichas de cada giro).',
-  max_bet: 'Monto máximo por apuesta (en el Double, por color y por ronda).',
-  max_profit: 'Ganancia máxima por apuesta o jugada. En el Crash y en Minas/Penales se cobra sola al llegar; en Plinko y Ruleta el premio se limita a este monto; en el Double limita cuánto se puede apostar al blanco. Protege a la casa de pagos gigantes.',
+  min_bet: 'Monto mínimo por apuesta (en la Ruleta, por cada tanda de fichas que se confirma).',
+  max_bet: 'Monto máximo por apuesta (en el Double, por color y por ronda; en la Ruleta, el total de fichas de un jugador en la ronda).',
+  max_profit: 'Ganancia máxima por apuesta o jugada. En el Crash y en Minas/Penales se cobra sola al llegar; en Plinko el premio se limita a este monto; en el Double y la Ruleta limita cuánto se puede apostar al blanco o a los plenos. Protege a la casa de pagos gigantes.',
   quick_amounts: 'Botones de monto rápido en los juegos, separados por coma.',
   betting_seconds: 'Crash: tiempo para apostar antes de cada despegue (de 3 a 30 segundos).',
   speed: 'Crash: 1 = normal (2x a los 11,5 s). 2 = el doble de rápido, 0,5 = la mitad. Se aplica desde la próxima ronda.',
@@ -64,8 +64,9 @@ const HINTS = {
   game_penalty: 'Si lo apagás nadie puede empezar tandas nuevas; las que están en curso se pueden terminar.',
   game_double: 'Si lo apagás mientras se apuesta, se devuelven las apuestas de esa ronda.',
   game_plinko: 'Si lo apagás nadie puede soltar bolitas hasta que lo vuelvas a prender.',
-  game_roulette: 'Si lo apagás nadie puede girar la ruleta hasta que la vuelvas a prender.',
+  game_roulette: 'Si la apagás mientras se apuesta, se devuelven las fichas de esa ronda. Si está girando, la ronda termina normal.',
   double_betting_seconds: 'Double: tiempo para apostar antes de cada giro (de 5 a 30 segundos). Se aplica desde la próxima ronda.',
+  roulette_betting_seconds: 'Ruleta en vivo: tiempo para poner fichas antes de cada giro (de 5 a 60 segundos). Se aplica desde la próxima ronda.',
   bots_enabled: 'Jugadores de la sala marcados con 🤖 que juegan con plata ficticia. No tocan la caja ni las estadísticas reales (ver Admin → Bots).',
   bots_count: 'Cuántos bots hay en la sala (de 1 a 40).',
   bots_chat: 'Comentan el juego de vez en cuando, siempre con la etiqueta BOT.',
@@ -481,17 +482,18 @@ function currentChainCard(c) {
   );
 }
 
-function doubleChainCard(data) {
+/** Cadena de un juego en vivo (Double o Ruleta): la ventaja sale de la tabla de pagos, no se cambia. */
+function liveChainCard(data, { title, pays, paysSub, rtp }) {
   const c = data.current;
   const used = Math.min(c.used, c.length);
   return card(
-    `🎡 Cadena del Double #${c.chainId}`,
+    `${title} #${c.chainId}`,
     { cls: 'fair-current', actions: h('span', { class: 'chip chip-green' }, 'Activa') },
     h(
       'div',
       { class: 'fair-stats' },
-      h('div', { class: 'fair-stat' }, h('div', { class: 'tile-label' }, 'Pagos'), h('div', { class: 'fair-big' }, '2x · 2x · 30x'), h('div', { class: 'tile-sub' }, '15 rojas · 15 negras · 1 blanca')),
-      h('div', { class: 'fair-stat' }, h('div', { class: 'tile-label' }, 'RTP para los jugadores'), h('div', { class: 'fair-big green' }, '96,77%')),
+      h('div', { class: 'fair-stat' }, h('div', { class: 'tile-label' }, 'Pagos'), h('div', { class: 'fair-big' }, pays), h('div', { class: 'tile-sub' }, paysSub)),
+      h('div', { class: 'fair-stat' }, h('div', { class: 'tile-label' }, 'RTP para los jugadores'), h('div', { class: 'fair-big green' }, rtp)),
       h('div', { class: 'fair-stat' }, h('div', { class: 'tile-label' }, 'Rondas usadas'), h('div', { class: 'fair-big' }, fmtNum(used)), h('div', { class: 'tile-sub' }, `de ${fmtNum(c.length)}`)),
       h('div', { class: 'fair-stat' }, h('div', { class: 'tile-label' }, 'Creada'), h('div', { class: 'fair-date' }, fmtDate(c.createdAt))),
     ),
@@ -576,23 +578,24 @@ export const fairView = {
     const load = async () => {
       const seq = ++this.seq;
       try {
-        const [data, dbl] = await Promise.all([call('/api/fair'), call('/api/fair?game=double')]);
+        const [data, dbl, rl] = await Promise.all([call('/api/fair'), call('/api/fair?game=double'), call('/api/fair?game=roulette')]);
         if (seq !== this.seq) return;
         const c = data.current;
         box.replaceChildren(
           h('div', { class: 'fair-grid' }, currentChainCard(c), rotateCard(c, load)),
-          doubleChainCard(dbl),
+          liveChainCard(dbl, { title: '🎡 Cadena del Double', pays: '2x · 2x · 30x', paysSub: '15 rojas · 15 negras · 1 blanca', rtp: '96,77%' }),
+          liveChainCard(rl, { title: '🎰 Cadena de la Ruleta', pays: '36x · 3x · 2x', paysSub: 'Pleno · docena y columna · afuera (37 números, un solo 0)', rtp: '97,30%' }),
           card(
-            '💣⚽🔴🎰 Juegos con semillas',
+            '💣⚽🔴 Juegos con semillas',
             { icon: 'key', cls: 'fair-how' },
             h(
               'p',
               null,
-              'Minas, Penales, Plinko y Ruleta no usan una cadena: cada jugador tiene su ',
+              'Minas, Penales y Plinko no usan una cadena: cada jugador tiene su ',
               h('b', null, 'semilla del servidor'),
               ' (secreta, pero ve su hash antes de jugar), su ',
               h('b', null, 'semilla propia'),
-              ' y un número de jugada (nonce). Cuando el jugador cambia sus semillas, la del servidor se revela y puede comprobar todas sus jugadas. Retorno: 97% en Minas, Penales y Plinko; 97,3% en la Ruleta (un solo 0).',
+              ' y un número de jugada (nonce). Cuando el jugador cambia sus semillas, la del servidor se revela y puede comprobar todas sus jugadas. Retorno: 97%.',
             ),
           ),
           card(

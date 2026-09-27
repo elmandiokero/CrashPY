@@ -675,6 +675,78 @@
   background: #0f9d58;
 }
 
+/* Ruleta en vivo: bolita con el número (listas y detalle de ronda). Prefijo rn- para no chocar con la pantalla de la Ruleta (rl-) */
+.rn-ball {
+  --rn-ball: #151827;
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.28), transparent 55%), var(--rn-ball);
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  color: #fff;
+  font-weight: 900;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.rn-ball.red {
+  --rn-ball: #d8263a;
+}
+
+.rn-ball.black {
+  --rn-ball: #151827;
+}
+
+.rn-ball.green {
+  --rn-ball: #0f9d58;
+}
+
+.rn-ball.big {
+  min-width: 68px;
+  height: 68px;
+  font-size: 1.7rem;
+  border-width: 3px;
+  margin: 2px auto 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.rn-hero-name {
+  margin-top: 4px;
+  font-weight: 800;
+}
+
+.rn-bets-cell {
+  max-width: 220px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.mr-badge.rn-badge {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.mr-badge.rn-badge.red {
+  background: #d8263a;
+}
+
+.mr-badge.rn-badge.black {
+  background: #151827;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.mr-badge.rn-badge.green {
+  background: #0f9d58;
+}
+
+.mr-badge.rn-badge.off {
+  opacity: 0.55;
+}
+
 /* Semillas */
 .seed-current {
   background: var(--panel-2);

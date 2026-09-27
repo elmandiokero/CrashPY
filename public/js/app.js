@@ -1,7 +1,7 @@
 // CrashPY · aplicación del jugador: sesión, saldo, billetera, chat, menú y los juegos.
 import { $, $$, h, api, fmtGs, fmtNum, fmtMult, fmtSigned, parseAmount, fmtDate, fmtTime, multClass, colorFor, toast, openModal, copyText } from './shared.js';
 import { Sound } from './sound.js';
-import { GAMES, GAME_BY_ID, SEED_GAMES, store, vibrate, avatar, openPlay, openFairness, openDoubleRound } from './games/common.js';
+import { GAMES, GAME_BY_ID, SEED_GAMES, store, vibrate, avatar, openPlay, openFairness, openDoubleRound, openRouletteRound } from './games/common.js';
 import { createCrash } from './games/crash.js';
 import { createMines } from './games/mines.js';
 import { createPenalty } from './games/penalty.js';
@@ -221,8 +221,9 @@ function route(id, { push = false } = {}) {
   if (push && location.pathname !== g.path) history.pushState({ game: g.id }, '', g.path);
   if (shell.current === g.id) return;
   const prev = shell.current && games[shell.current];
-  if (prev && prev.hide) prev.hide();
+  // Primero cambia el juego actual: dentro de hide(), shell.isVisible(juego anterior) ya da false
   shell.current = g.id;
+  if (prev && prev.hide) prev.hide();
   $$('.game-view').forEach((v) => (v.hidden = v.dataset.view !== g.id));
   const game = games[g.id];
   const view = $(`.game-view[data-view="${g.id}"]`);
@@ -470,10 +471,11 @@ $('#topPeriod').addEventListener('click', (e) => {
   loadTop();
 });
 
-/** Abre el detalle correcto según el juego (ronda del Crash, ronda del Double o jugada). */
+/** Abre el detalle correcto según el juego (ronda del Crash, del Double o de la Ruleta, o jugada). */
 function openWin(w) {
   if (w.game === 'crash') games.crash.openRound(w.round_id);
   else if (w.game === 'double') openDoubleRound(shell, w.round_id);
+  else if (w.game === 'roulette') openRouletteRound(shell, w.round_id);
   else openPlay(shell, w.round_id);
 }
 
@@ -484,7 +486,7 @@ async function loadTop() {
     const section = (title, rows) => h('div', { class: 'top-section' }, h('h4', null, title), rows.length ? rows : h('div', { class: 'empty' }, 'Todavía nada por acá'));
     const winRow = (w, i, mode) => {
       const g = GAME_BY_ID[w.game] || GAME_BY_ID.crash;
-      const where = w.game === 'crash' || w.game === 'double' ? `ronda #${w.round_id}` : `jugada #${w.round_id}`;
+      const where = ['crash', 'double', 'roulette'].includes(w.game) ? `ronda #${w.round_id}` : `jugada #${w.round_id}`;
       return h(
         'div',
         { class: 'top-row', onclick: () => openWin(w), style: { cursor: 'pointer' } },
@@ -1328,7 +1330,7 @@ function openRules() {
       h(
         'p',
         { class: 'hint' },
-        'Crash y Double salen de cadenas de hashes publicadas de antemano. Minas, Penales, Plinko y Ruleta usan tus semillas: la del servidor queda fijada (ves su hash) antes de jugar y vos elegís la tuya. Nadie (ni el casino) puede cambiar un resultado. Mirá ',
+        'Crash, Double y Ruleta (en vivo) salen de cadenas de hashes publicadas de antemano. Minas, Penales y Plinko usan tus semillas: la del servidor queda fijada (ves su hash) antes de jugar y vos elegís la tuya. Nadie (ni el casino) puede cambiar un resultado. Mirá ',
         h('a', { href: '/fair' }, 'la página de verificación'),
         SEED_GAMES.includes(g.id) ? [' o tus ', h('a', { href: '#', onclick: (e) => (e.preventDefault(), openFairness(shell)) }, 'semillas')] : null,
         '.',

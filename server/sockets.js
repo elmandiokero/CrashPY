@@ -15,7 +15,7 @@ const ACTIONS_PER_10S = 80;
  *  - Namespace "/admin" → solo administradores (estadísticas en vivo, avisos de depósitos/retiros, actividad).
  */
 module.exports = function setupSockets(io, ctx) {
-  const { db, auth, engine, chat, bus, settings, chains, plays, double, bots } = ctx;
+  const { db, auth, engine, chat, bus, settings, chains, plays, double, roulette, bots } = ctx;
   const limiter = new RateLimiter();
   const online = new Map(); // userId → { id, username, sockets, since, ip, ua }
 
@@ -79,6 +79,8 @@ module.exports = function setupSockets(io, ctx) {
       mine: user ? engine.userBets(user.id) : [null, null],
       double: withBots(double.publicState(), bots.doubleBets()),
       myDouble: user ? double.userBets(user.id) : null,
+      roulette: withBots(roulette.publicState(), bots.rouletteBets()),
+      myRoulette: user ? roulette.userBets(user.id) : null,
       plays: user ? plays.activePlays(user.id) : { mines: null, penalty: null },
       feed: recentFeed,
       chat: chat.recent,
@@ -167,8 +169,9 @@ module.exports = function setupSockets(io, ctx) {
     playHandler('penalty:kick', 'penaltyKick');
     playHandler('penalty:cashout', 'penaltyCashout');
     playHandler('plinko:drop', 'plinkoDrop');
-    playHandler('roulette:spin', 'rouletteSpin');
+    // Juegos en vivo: la respuesta trae mis apuestas de la ronda y el saldo
     handle('double:bet', (u, d) => ({ mine: double.placeBet(u.id, d), balance: balanceOf(u) }));
+    handle('roulette:bet', (u, d) => ({ mine: roulette.placeBet(u.id, d), balance: balanceOf(u) }));
 
     socket.on('disconnect', () => {
       onlineDirty = true;
@@ -193,9 +196,10 @@ module.exports = function setupSockets(io, ctx) {
   engine.on('betRefund', (d) => io.emit('betRefund', d));
   engine.on('paused', (d) => io.emit('paused', d));
 
-  // Double → todos
+  // Double y Ruleta → todos
   for (const name of ['betting', 'bet', 'spin', 'result', 'refund', 'paused']) {
     double.on(name, (d) => io.emit('double:' + name, d));
+    roulette.on(name, (d) => io.emit('roulette:' + name, d));
   }
 
   // Bots → mismos eventos que los jugadores, siempre con bot: true y 🤖 en el nombre
@@ -203,6 +207,7 @@ module.exports = function setupSockets(io, ctx) {
   bots.on('crash:cashout', (d) => io.emit('cashout', d));
   bots.on('crash:refund', (d) => io.emit('betRefund', d));
   bots.on('double:bet', (b) => io.emit('double:bet', b));
+  bots.on('roulette:bet', (b) => io.emit('roulette:bet', b));
   bots.on('online', () => {
     onlineDirty = true;
   });
@@ -211,6 +216,7 @@ module.exports = function setupSockets(io, ctx) {
   bus.on('balance', (userId, balance) => io.to('u:' + userId).emit('balance', { balance }));
   bus.on('myBet', (userId, bet) => io.to('u:' + userId).emit('myBet', bet));
   bus.on('myDouble', (userId, d) => io.to('u:' + userId).emit('myDouble', d));
+  bus.on('myRoulette', (userId, d) => io.to('u:' + userId).emit('myRoulette', d));
   bus.on('notify', (userId, n) => io.to('u:' + userId).emit('notify', n));
   bus.on('userUpdate', (userId) => {
     const u = loadUser(userId);
@@ -269,7 +275,7 @@ module.exports = function setupSockets(io, ctx) {
       if (b.status === 'cancelled' || b.status === 'refunded') continue;
       inRound.set(b.userId, (inRound.get(b.userId) || 0) + b.amount);
     }
-    for (const b of double.bets.values()) {
+    for (const b of [...double.bets.values(), ...roulette.bets.values()]) {
       if (b.status === 'refunded') continue;
       inRound.set(b.userId, (inRound.get(b.userId) || 0) + b.amount);
     }
@@ -291,6 +297,7 @@ module.exports = function setupSockets(io, ctx) {
       onlineUsers: onlineUsers(),
       game: engine.adminState(),
       double: double.adminState(),
+      roulette: roulette.adminState(),
       pending: stats.pending(db),
     };
   }
@@ -317,6 +324,7 @@ module.exports = function setupSockets(io, ctx) {
   bus.on('activity', (a) => adminNs.emit('activity', { ...a, ts: Date.now() }));
   engine.on('crash', (d) => adminNs.emit('roundEnd', d));
   double.on('result', (d) => adminNs.emit('doubleEnd', d));
+  roulette.on('result', (d) => adminNs.emit('rouletteEnd', d));
 
   return { snapshot };
 };

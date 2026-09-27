@@ -6,7 +6,8 @@ const GAMES = ['crash', 'double', 'mines', 'penalty', 'plinko', 'roulette'];
 
 /**
  * Todas las jugadas terminadas de todos los juegos, con la misma forma:
- *   t = cuándo terminó · bet = apostado · payout = pagado · rounds = rondas (Crash/Double) · n = participaciones
+ *   t = cuándo terminó · bet = apostado · payout = pagado · rounds = rondas (Crash/Double/Ruleta) · n = participaciones
+ * Recibe el mismo "desde" 4 veces (uno por tabla): usá allPlaysParams(since).
  */
 const ALL_PLAYS = `
   SELECT 'crash' AS game, ended_at AS t, total_bet AS bet, total_payout AS payout, 1 AS rounds, players AS n
@@ -15,17 +16,19 @@ const ALL_PLAYS = `
   SELECT 'double', ended_at, total_bet, total_payout, 1, players
     FROM double_rounds WHERE status = 'ended' AND ended_at >= ?
   UNION ALL
+  SELECT 'roulette', ended_at, total_bet, total_payout, 1, players
+    FROM roulette_rounds WHERE status = 'ended' AND ended_at >= ?
+  UNION ALL
   SELECT game, ended_at, amount, payout, 0, 1
     FROM plays WHERE status IN ('won', 'lost') AND ended_at >= ?`;
+const allPlaysParams = (since) => [since, since, since, since];
 
 function gamesAgg(db, since) {
   const rows = db.all(
     `SELECT game, COALESCE(SUM(bet), 0) AS bet, COALESCE(SUM(payout), 0) AS payout,
             COALESCE(SUM(rounds), 0) AS rounds, COALESCE(SUM(n), 0) AS plays
      FROM (${ALL_PLAYS}) GROUP BY game`,
-    since,
-    since,
-    since,
+    ...allPlaysParams(since),
   );
   const games = {};
   for (const g of GAMES) games[g] = { bet: 0, payout: 0, profit: 0, rounds: 0, plays: 0 };
@@ -96,9 +99,7 @@ function charts(db) {
     .all(
       `SELECT CAST(t / 3600000 AS INTEGER) AS h, COALESCE(SUM(bet), 0) AS bet, COALESCE(SUM(payout), 0) AS payout, COUNT(*) AS n
        FROM (${ALL_PLAYS}) GROUP BY h ORDER BY h`,
-      since,
-      since,
-      since,
+      ...allPlaysParams(since),
     )
     .map((r) => ({ t: r.h * 3600000, bet: r.bet, payout: r.payout, profit: r.bet - r.payout, rounds: r.n }));
   const from = startOfDay() - 13 * DAY;
@@ -107,9 +108,7 @@ function charts(db) {
       `SELECT strftime('%Y-%m-%d', t / 1000, 'unixepoch', 'localtime') AS d,
               COALESCE(SUM(bet), 0) AS bet, COALESCE(SUM(payout), 0) AS payout, COUNT(*) AS n
        FROM (${ALL_PLAYS}) GROUP BY d ORDER BY d`,
-      from,
-      from,
-      from,
+      ...allPlaysParams(from),
     )
     .map((r) => ({ day: r.d, bet: r.bet, payout: r.payout, profit: r.bet - r.payout, rounds: r.n }));
   return { hourly, daily };

@@ -10,10 +10,10 @@ export const GAMES = [
   { id: 'penalty', path: '/penales', name: 'Penales', icon: '⚽', tagline: 'Penales de la Albirroja' },
   { id: 'double', path: '/double', name: 'Double', icon: '🎡', tagline: 'Rojo, negro o blanco 30x' },
   { id: 'plinko', path: '/plinko', name: 'Plinko', icon: '🔴', tagline: 'Soltá la bolita y mirá dónde cae' },
-  { id: 'roulette', path: '/ruleta', name: 'Ruleta', icon: '🎰', tagline: 'Ruleta europea de 37 números' },
+  { id: 'roulette', path: '/ruleta', name: 'Ruleta', icon: '🎰', tagline: 'En vivo · ruleta europea' },
 ];
 export const GAME_BY_ID = Object.fromEntries(GAMES.map((g) => [g.id, g]));
-export const SEED_GAMES = ['mines', 'penalty', 'plinko', 'roulette'];
+export const SEED_GAMES = ['mines', 'penalty', 'plinko'];
 
 // ───────────────────────── Utilidades ─────────────────────────
 
@@ -319,6 +319,16 @@ export function rouletteBetName(b) {
   return ROULETTE_BET_NAMES[b.type] || b.type;
 }
 
+export const ROULETTE_EMOJI = { red: '🔴', black: '⚫\uFE0F', green: '🟢' };
+export const ROULETTE_COLOR_NAMES = { red: 'rojo', black: 'negro', green: 'verde' };
+
+/** Resumen de las fichas de una apuesta: las más grandes primero ("Rojo, Pleno 17 y 2 más"). */
+export function rouletteBetsLabel(bets, max = 2) {
+  const names = [...(bets || [])].sort((a, b) => b.amount - a.amount).map(rouletteBetName);
+  if (names.length <= max) return names.join(', ');
+  return `${names.slice(0, max).join(', ')} y ${names.length - max} más`;
+}
+
 /** Resumen corto de una jugada (para listas). */
 export function playSummary(p) {
   switch (p.game) {
@@ -332,8 +342,11 @@ export function playSummary(p) {
     }
     case 'plinko':
       return `${p.params.rows} filas · riesgo ${RISK_NAMES[p.params.risk] || p.params.risk}`;
-    case 'roulette':
-      return `Salió ${p.number} ${core.rouletteColor(p.number) === 'red' ? '🔴' : core.rouletteColor(p.number) === 'black' ? '⚫' : '🟢'}`;
+    case 'roulette': {
+      if (p.status === 'refunded') return `${rouletteBetsLabel(p.bets)} · devuelta`;
+      const n = p.result ?? p.number;
+      return `${rouletteBetsLabel(p.bets)} · salió ${n} ${ROULETTE_EMOJI[core.rouletteColor(n)]}`;
+    }
     default:
       return '';
   }
@@ -425,9 +438,11 @@ export function playVisual(p) {
       );
     }
     case 'roulette': {
-      const color = core.rouletteColor(p.number);
-      const bets = (p.params.bets || []).map((b) => {
-        const win = core.rouletteWins(b, p.number);
+      // Sirve para una apuesta de la ruleta en vivo ({ result, bets })
+      const n = p.result ?? p.number;
+      const color = core.rouletteColor(n);
+      const bets = (p.bets || (p.params && p.params.bets) || []).map((b) => {
+        const win = core.rouletteWins(b, n);
         return h(
           'tr',
           null,
@@ -439,7 +454,7 @@ export function playVisual(p) {
       return h(
         'div',
         { class: 'mini-roulette' },
-        h('div', { class: `mr-number ${color}` }, String(p.number)),
+        h('div', { class: `mr-number ${color}` }, String(n)),
         h(
           'div',
           { class: 'table-wrap' },
@@ -462,8 +477,6 @@ export function recompute(game, params, serverSeed, clientSeed, nonce) {
       return { keepers: core.penaltyKeepers(floats) };
     case 'plinko':
       return core.plinkoResult(floats, params.rows, params.risk);
-    case 'roulette':
-      return { number: core.rouletteNumber(floats) };
     default:
       return null;
   }
@@ -477,8 +490,6 @@ function sameResult(p, r) {
       return JSON.stringify(r.keepers) === JSON.stringify(p.keepers);
     case 'plinko':
       return JSON.stringify(r.path) === JSON.stringify(p.path) && r.bucket === p.bucket;
-    case 'roulette':
-      return r.number === p.number;
     default:
       return false;
   }
@@ -606,7 +617,7 @@ export async function openFairness(shell) {
       h(
         'p',
         { class: 'hint', style: { marginTop: 0 } },
-        'Cada resultado de Minas, Penales, Plinko y Ruleta sale de tres datos: la semilla del servidor (secreta; antes de jugar ves su hash), tu semilla y el número de jugada (nonce). Como el hash ya está publicado, el casino no puede cambiar nada. Al cambiar las semillas se revela la del servidor y podés comprobar todas tus jugadas.',
+        'Cada resultado de Minas, Penales y Plinko sale de tres datos: la semilla del servidor (secreta; antes de jugar ves su hash), tu semilla y el número de jugada (nonce). Como el hash ya está publicado, el casino no puede cambiar nada. Al cambiar las semillas se revela la del servidor y podés comprobar todas tus jugadas. (El Crash, el Double y la Ruleta son en vivo: se verifican con su cadena de hashes.)',
       ),
       h(
         'div',
@@ -706,6 +717,135 @@ export async function openDoubleRound(shell, id) {
     );
   } catch (err) {
     body.replaceChildren(h('div', { class: 'empty' }, err.message));
+  }
+}
+
+// ───────────────────────── 🎰 Ruleta en vivo: detalle de ronda y mis apuestas ─────────────────────────
+
+/** Bolita con el número y su color (para listas y detalles). Clase rn-ball (rl-* es de la pantalla de la Ruleta). */
+export function rouletteBall(n, extra = '') {
+  return h('span', { class: `rn-ball ${core.rouletteColor(n)}${extra ? ' ' + extra : ''}` }, String(n));
+}
+
+export async function openRouletteRound(shell, id) {
+  const body = h('div', null, h('div', { class: 'empty' }, h('span', { class: 'spinner' })));
+  openModal({ title: `🎰 Ruleta · ronda #${id}`, content: body, wide: true });
+  try {
+    const data = await api(`/api/roulette/rounds/${id}`);
+    const r = data.round;
+    if (!r.hash) {
+      body.replaceChildren(h('div', { class: 'empty' }, 'Esta ronda todavía no giró. El hash se revela cuando gira 🔒'));
+      return;
+    }
+    const chain = data.chain;
+    const color = core.rouletteColor(r.result);
+    const prevHash = data.previous ? data.previous.hash : r.chain_index === 1 ? chain.terminal_hash : null;
+    const verifyOut = h('div');
+    const verify = () => {
+      const n = core.rouletteNumberFromHmac(hmacSha256Hex(chain.salt, r.hash));
+      const link = prevHash ? sha256Hex(r.hash) === prevHash : null;
+      const ok = n === r.result && link !== false;
+      verifyOut.replaceChildren(
+        h(
+          'div',
+          { class: `verify-box ${ok ? 'ok' : 'bad'}` },
+          h('div', null, `${n === r.result ? '✅' : '❌'} El hash da el número ${n} (${ROULETTE_COLOR_NAMES[core.rouletteColor(n)]})`),
+          link === null ? h('div', null, 'ℹ️ No tenemos el hash anterior para comprobar la cadena.') : h('div', null, `${link ? '✅' : '❌'} SHA-256 de este hash = hash de la ronda anterior`),
+        ),
+      );
+    };
+    const rows = data.bets.map((b) =>
+      h(
+        'tr',
+        null,
+        h('td', null, b.user),
+        h('td', { class: 'rn-bets-cell' }, rouletteBetsLabel(b.bets, 3)),
+        h('td', { class: 'num' }, fmtGs(b.amount)),
+        h(
+          'td',
+          { class: `num ${b.status === 'refunded' ? 'muted' : b.payout > b.amount ? 'green' : b.payout < b.amount ? 'red' : 'muted'}` },
+          b.status === 'refunded' ? 'devuelta' : fmtSigned(b.payout - b.amount),
+        ),
+      ),
+    );
+    body.replaceChildren(
+      h(
+        'div',
+        { class: 'round-hero' },
+        rouletteBall(r.result, 'big'),
+        h('small', null, r.status === 'cancelled' ? 'Ronda anulada (no se jugó)' : `${fmtDate(r.ended_at)} · ${r.players} jugador${r.players === 1 ? '' : 'es'} · apostado ${fmtGs(r.total_bet)}`),
+        r.status === 'cancelled' ? null : h('div', { class: 'rn-hero-name' }, `Salió el ${r.result} ${ROULETTE_EMOJI[color]} ${ROULETTE_COLOR_NAMES[color]}`),
+      ),
+      h(
+        'dl',
+        { class: 'kv' },
+        h('dt', null, 'Hash'),
+        h('dd', { class: 'mono' }, r.hash, ' ', h('button', { class: 'copy-btn', type: 'button', onclick: () => copyText(r.hash) }, '📋')),
+        h('dt', null, r.chain_index === 1 ? 'Hash terminal' : 'Hash anterior'),
+        h('dd', { class: 'mono' }, prevHash || '—'),
+        h('dt', null, 'Sal (salt)'),
+        h('dd', { class: 'mono' }, chain.salt),
+        h('dt', null, 'Cadena'),
+        h('dd', null, `#${chain.id} · ronda ${fmtNum(r.chain_index)} de ${fmtNum(chain.length)}`),
+      ),
+      h('button', { class: 'btn btn-blue btn-block', type: 'button', onclick: verify }, '✔ Verificar en este dispositivo'),
+      verifyOut,
+      h('p', { style: { textAlign: 'center', margin: '10px 0' } }, h('a', { href: `/fair?game=roulette&hash=${r.hash}&salt=${chain.salt}` }, '¿Cómo funciona? Verificación completa →')),
+      rows.length
+        ? h(
+            'div',
+            { class: 'table-wrap' },
+            h(
+              'table',
+              { class: 'table' },
+              h('thead', null, h('tr', null, h('th', null, 'Jugador'), h('th', null, 'Fichas'), h('th', { class: 'num' }, 'Apuesta'), h('th', { class: 'num' }, 'Resultado'))),
+              h('tbody', null, ...rows),
+            ),
+          )
+        : h('div', { class: 'empty' }, 'Nadie apostó en esta ronda'),
+    );
+  } catch (err) {
+    body.replaceChildren(h('div', { class: 'empty' }, err.message));
+  }
+}
+
+/** Una fila de "Mis apuestas" de la Ruleta (abre la ronda para verla y verificarla). */
+export function rouletteMineRow(shell, p) {
+  const refunded = p.status === 'refunded';
+  const net = p.payout - p.amount;
+  const badge = refunded
+    ? h('span', { class: 'mr-badge muted' }, '↩')
+    : h('span', { class: `mr-badge rn-badge ${core.rouletteColor(p.result)}${p.payout > 0 ? '' : ' off'}` }, String(p.result));
+  const result = refunded ? h('span', { class: 'muted' }, 'Devuelta') : h('span', { class: net > 0 ? 'green' : net < 0 ? 'red' : 'muted' }, fmtSigned(net));
+  const sub = refunded
+    ? `Ronda #${p.roundId} · apuesta devuelta · ${fmtTime(p.createdAt)}`
+    : `Ronda #${p.roundId} · salió ${p.result} ${ROULETTE_EMOJI[core.rouletteColor(p.result)]} · ${fmtTime(p.createdAt)}`;
+  return h(
+    'div',
+    { class: 'mine-row', style: { cursor: 'pointer' }, title: 'Ver la ronda y verificarla', onclick: () => openRouletteRound(shell, p.roundId) },
+    badge,
+    h('div', { class: 'mr-main' }, h('div', { class: 'mr-top' }, `Apostaste ${fmtGs(p.amount)} · ${rouletteBetsLabel(p.bets)}`), h('div', { class: 'mr-sub' }, sub)),
+    h('div', { class: 'mr-result' }, result),
+  );
+}
+
+/** Lista "Mis apuestas" de la Ruleta. */
+export async function loadRouletteMine(shell, container) {
+  if (!shell.state.user) {
+    container.replaceChildren(
+      h('div', { class: 'empty' }, 'Ingresá para ver tus apuestas', h('br'), h('br'), h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => shell.openAuth('login') }, 'Ingresar')),
+    );
+    return;
+  }
+  try {
+    const { items } = await api('/api/plays?game=roulette&limit=40');
+    if (!items.length) {
+      container.replaceChildren(h('div', { class: 'empty' }, 'Todavía no jugaste acá. ¡Probá suerte! 🍀'));
+      return;
+    }
+    container.replaceChildren(...items.map((p) => rouletteMineRow(shell, p)));
+  } catch (err) {
+    container.replaceChildren(h('div', { class: 'empty' }, err.message));
   }
 }
 

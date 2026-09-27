@@ -671,7 +671,8 @@ const GAME_COLS = [
     main: true,
     render: (g) => {
       const meta = GAME_META[g.game] || GAME_META.crash;
-      return h('span', { class: 'round-id' }, `${meta.icon} ${meta.name} ${g.game === 'double' ? `· ronda #${g.round_id}` : `#${g.id}`}`);
+      const live = g.game === 'double' || g.game === 'roulette';
+      return h('span', { class: 'round-id' }, `${meta.icon} ${meta.name} ${live ? `· ronda #${g.round_id}` : `#${g.id}`}`);
     },
   },
   { label: 'Monto', cls: 'num', render: (g) => fmtGs(g.amount) },
@@ -685,7 +686,7 @@ const GAME_COLS = [
         ? h('span', { class: 'chip chip-gold' }, 'En curso')
         : g.status === 'refunded'
           ? h('span', { class: 'chip' }, 'Devuelta')
-          : h('span', { class: g.payout - g.amount >= 0 ? 'green' : 'red' }, fmtSigned(g.payout - g.amount)),
+          : h('span', { class: g.payout - g.amount > 0 ? 'green' : g.payout - g.amount < 0 ? 'red' : 'muted' }, fmtSigned(g.payout - g.amount)),
   },
   { label: 'Fecha', cls: 'num', render: (g) => fmtDate(g.created_at) },
 ];

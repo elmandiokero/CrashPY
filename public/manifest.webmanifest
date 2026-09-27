@@ -1,7 +1,7 @@
 {
   "name": "CrashPY · El casino paraguayo",
   "short_name": "CrashPY",
-  "description": "Crash, Minas, Penales, Double, Plinko y Ruleta en guaraníes. Todo comprobable.",
+  "description": "Crash, Double y Ruleta en vivo, Minas, Penales y Plinko en guaraníes. Todo comprobable.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

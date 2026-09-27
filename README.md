@@ -18,9 +18,9 @@ Todos los resultados son **comprobables (provably fair)**, con **chat**, **depó
 | 🚀 **Crash** (`/`) | El cohete sube: retirá antes de que explote. 2 apuestas por ronda, retiro y apuesta automáticos. | 97 % | Cadena de hashes |
 | 💣 **Minas** (`/minas`) | Tablero de 5×5 con 1 a 24 minas. Cada diamante sube el multiplicador; retirás cuando quieras. | 97 % | Semillas del jugador |
 | ⚽ **Penales** (`/penales`) | Pateá hasta 5 penales con la Albirroja: izquierda, centro o derecha. Cada gol multiplica (1,45x → 7,36x). | 97 % | Semillas del jugador |
-| 🎡 **Double** (`/double`) | Ruleta de colores multijugador: rojo 2x, negro 2x o blanco 30x. Una ronda cada ~25 segundos. | 96,8 % | Cadena de hashes propia |
+| 🎡 **Double** (`/double`) | **En vivo**: ruleta de colores para todos a la vez: rojo 2x, negro 2x o blanco 30x. Una ronda cada ~25 segundos. | 96,8 % | Cadena de hashes propia |
 | 🔴 **Plinko** (`/plinko`) | Soltá bolitas: de 8 a 16 filas y 3 niveles de riesgo (hasta 1.000x). Con modo automático. | ~97 % | Semillas del jugador |
-| 🎰 **Ruleta** (`/ruleta`) | Ruleta europea (un solo 0) con mesa completa: plenos, docenas, columnas, colores, par/impar… | 97,3 % | Semillas del jugador |
+| 🎰 **Ruleta** (`/ruleta`) | **En vivo**: ruleta europea (un solo 0) con mesa completa. Todos ponen fichas durante la cuenta regresiva, se ven las apuestas de los demás al instante y una sola bolita decide para todos. | 97,3 % | Cadena de hashes propia |
 
 Cada juego tiene su dirección propia y se cambia de juego desde el menú de arriba sin perder el saldo, el chat ni la conexión.
 Las partidas de Minas y Penales quedan guardadas: si se cierra la página, al volver se sigue donde estaba.
@@ -31,6 +31,7 @@ Las partidas de Minas y Penales quedan guardadas: si se cierra la página, al vo
 - Seis juegos con animaciones, sonidos y vibración en el celular (el premio aparece en el saldo cuando termina la animación, no antes).
 - Multiplicador en tiempo real (2x ≈ 11,5 s, 10x ≈ 38 s) y **retiro en cualquier momento**.
 - **2 apuestas por ronda**, **retiro automático** (funciona aunque se corte internet) y **apuesta automática**.
+- **Double y Ruleta en vivo**: una sola rueda para todos, con cuenta regresiva y las apuestas de los demás al instante.
 - Apuestas en vivo de todos, **jugadas en vivo de todo el casino**, historial, "Mis apuestas" de cada juego y **Top ganadores** del día / semana / mes.
 - **Chat** con emojis, anuncios del admin y avisos automáticos de ganancias grandes.
 - **Billetera**: depositar por transferencia (con foto del comprobante), retirar a cualquier banco o billetera, movimientos y estado de solicitudes.
@@ -40,11 +41,11 @@ Las partidas de Minas y Penales quedan guardadas: si se cierra la página, al vo
 **Para el administrador (`/admin`)**
 - Tablero en vivo: conectados, qué apuesta cada uno, ganancia de la casa por hora/día, actividad.
 - **Ronda en vivo** del Crash con todas las apuestas, botón **💥 Explotar ahora** y **⏸ Pausar / ▶ Reanudar**.
-- **Juegos**: prendé o pausá cada juego con un toque, ganancia de la casa por juego, **Double en vivo** (cuánto ganaría o perdería la casa según el color que salga), jugadas en vivo e historial de todas las jugadas con su detalle.
+- **Juegos**: prendé o pausá cada juego con un toque, ganancia de la casa por juego, **Double y Ruleta en vivo** (cuánto ganaría o perdería la casa según el color o el número que salga), jugadas en vivo e historial de todas las jugadas con su detalle.
 - **Usuarios**: buscar, ver ficha completa (con sus jugadas de cada juego), **editar saldo** (sumar / restar / fijar), suspender, silenciar en el chat, cambiar contraseña, cuentas con la misma IP.
 - **Depósitos** (con foto del comprobante) y **retiros** (con datos bancarios para copiar): aprobar / rechazar con un toque. Avisos con sonido.
 - **Chat**: borrar mensajes, silenciar, anuncios.
-- **Configuración**: apuestas mínimas/máximas, ganancia máxima, juegos activos, tiempos de apuesta del Crash y del Double, datos bancarios, WhatsApp de soporte, bono de bienvenida…
+- **Configuración**: apuestas mínimas/máximas, ganancia máxima, juegos activos, tiempos de apuesta del Crash, del Double y de la Ruleta, datos bancarios, WhatsApp de soporte, bono de bienvenida…
 - **🤖 Bots** (opcional): jugadores de la sala que animan el casino — apuestan en todos los juegos y comentan en el chat. Ver abajo.
 - **Auditoría**: todo lo que hace cada admin queda registrado. **Libro contable**: cada guaraní que entra o sale queda anotado.
 - **Respaldos** automáticos de la base de datos cada 6 horas y descarga manual.
@@ -106,7 +107,7 @@ En *Admin → Bots* podés prender bots (de 1 a 40) que juegan todos los juegos 
 
 - **Siempre se ven como bots**: el nombre empieza con 🤖, en el chat llevan la etiqueta **BOT** y el contador dice "1 en línea · 🤖 12 bots". Nadie los confunde con jugadores reales (hacerlos pasar por personas sería engañar a quien apuesta plata de verdad).
 - **Plata ficticia**: no tienen saldo, no depositan ni retiran y no tocan el libro contable ni la caja.
-- **Mismas probabilidades que todos**: juegan con la misma matemática y **no cambian ningún resultado real** (el Crash y el Double salen de la cadena de hashes; los demás, de las semillas de cada jugador).
+- **Mismas probabilidades que todos**: juegan con la misma matemática y **no cambian ningún resultado real** (el Crash, el Double y la Ruleta salen de su cadena de hashes; los demás, de las semillas de cada jugador). En el Double y la Ruleta en vivo apuestan en la misma ronda que todos.
 - **Fuera de las estadísticas reales**: el inicio del panel, los gráficos, el Top y las jugadas del panel muestran solo lo real. Lo que ganan o pierden los bots se ve **aparte**, en *Admin → Bots* (por juego y por día).
 - En el chat comentan el juego de vez en cuando; **nunca hablan de depósitos o retiros ni empujan a nadie a apostar**. Se puede apagar solo el chat de los bots.
 
@@ -130,7 +131,7 @@ Todo se maneja en **guaraníes enteros** y **cada cambio de saldo queda en el li
 **Ajustes manuales**: en la ficha de cada usuario podés **sumar, restar o fijar** el saldo (por ejemplo, un depósito que te mandaron por WhatsApp). Siempre queda registrado con el motivo.
 
 **Ganancia de la casa**: viene de la **ventaja matemática** de cada juego (≈ 3 %: RTP 97 % en Crash, Minas, Penales y Plinko, 97,3 % en la Ruleta y 96,8 % en el Double). En el largo plazo la casa se queda con ~3 % de todo lo apostado. Además podés limitar:
-- **Apuesta máxima** y **ganancia máxima por apuesta o jugada** (en el Crash, Minas y Penales se cobra sola al llegar al tope; en Plinko y Ruleta el premio se limita a ese monto; en el Double limita cuánto se puede apostar al blanco).
+- **Apuesta máxima** y **ganancia máxima por apuesta o jugada** (en el Crash, Minas y Penales se cobra sola al llegar al tope; en Plinko el premio se limita a ese monto; en el Double y la Ruleta limita cuánto se puede apostar al blanco o a los plenos).
 
 ---
 
@@ -154,7 +155,13 @@ casilla = floor(primeros 52 bits de hmac / 2^52 × 31)      0 = blanco · impar 
 ```
 El hash de la ronda se publica cuando la rueda empieza a girar (las apuestas ya están cerradas).
 
-**💣 Minas · ⚽ Penales · 🔴 Plinko · 🎰 Ruleta**: usan las **semillas de cada jugador**, como los casinos cripto más conocidos.
+**🎰 Ruleta en vivo**: también tiene su propia cadena de hashes. El número ganador de cada ronda:
+```
+número = floor(primeros 52 bits de HMAC_SHA256(sal, hash) / 2^52 × 37)      0 a 36 (un solo cero)
+```
+Cada jugador puede confirmar fichas varias veces mientras la cuenta regresiva sigue; al cerrarse las apuestas gira la bolita y se publica el hash.
+
+**💣 Minas · ⚽ Penales · 🔴 Plinko**: usan las **semillas de cada jugador**, como los casinos cripto más conocidos.
 - Antes de jugar, el servidor fija una **semilla secreta** y le muestra al jugador su **hash SHA-256**; el jugador elige **su propia semilla**; cada jugada usa el siguiente **nonce** (0, 1, 2…).
 - Los números al azar salen de `HMAC_SHA256(clave = semilla del servidor, mensaje = "semilla del cliente:nonce:ronda")`.
 - Desde **🔐 Justo → Mis semillas** el jugador cambia su par de semillas: en ese momento se **revela** la semilla del servidor y puede comprobar cada jugada (en el detalle de la jugada o en `/fair`). Mientras tenga una partida de Minas o Penales abierta no puede cambiarlas.
@@ -175,7 +182,7 @@ La ronda queda marcada como **anulada** en el historial público junto con su ha
 - Contraseñas guardadas con **scrypt**; sesiones con cookies `HttpOnly`.
 - Límites contra abuso (intentos de login, registros, mensajes, acciones por segundo).
 - El punto de explosión **nunca** se envía antes de que la ronda termine; tampoco dónde están las minas o hacia dónde se tira el arquero mientras la partida sigue abierta.
-- Si el servidor se apaga o se corta la luz en medio de una ronda del Crash, al volver **la ronda se anula y se devuelven las apuestas**. En el Double: si todavía se apostaba, se devuelven las apuestas; si la rueda ya estaba girando (el resultado ya se vio), la ronda se paga normalmente. Las partidas de Minas y Penales quedan guardadas.
+- Si el servidor se apaga o se corta la luz en medio de una ronda del Crash, al volver **la ronda se anula y se devuelven las apuestas**. En el Double y la Ruleta: si todavía se apostaba, se devuelven las apuestas; si la rueda ya estaba girando (el resultado ya se vio), la ronda se paga normalmente. Las partidas de Minas y Penales quedan guardadas.
 - **Respaldos**: se guarda una copia de la base de datos cada 6 horas en `data\backups\` (se conservan los últimos 30). También podés descargar una desde *Admin → Configuración → Respaldos*.
   👉 **Copiá la carpeta `data` a un pendrive o a la nube de vez en cuando.** Ahí está todo: usuarios, saldos, apuestas y comprobantes.
 - No compartas la carpeta `data` ni el archivo `.env`.
@@ -224,8 +231,10 @@ server/
   game.js         motor del Crash (fases, apuestas, retiros, explosión, controles admin)
   games/
     seeds.js      semillas provably fair de cada jugador
-    plays.js      Minas, Penales, Plinko y Ruleta
-    double.js     motor del Double (rondas multijugador)
+    plays.js      Minas, Penales y Plinko
+    rounds.js     base de los juegos en vivo por rondas (apuestas, giro, pagos, cortes, pausa)
+    double.js     🎡 Double en vivo
+    roulette.js   🎰 Ruleta en vivo
   fair.js         cadenas de hashes y fórmula del punto de explosión
   wallet.js       saldos, libro contable, depósitos, retiros, ajustes
   stats.js        estadísticas del panel (por juego)

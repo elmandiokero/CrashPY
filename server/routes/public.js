@@ -5,11 +5,15 @@ const { hashPassword, verifyPassword, requireUser, publicUser } = require('../au
 
 const USERNAME_RE = /^[a-zA-Z0-9_.]{3,16}$/;
 const DAY = 86_400_000;
-const PLAY_GAMES = new Set(['mines', 'penalty', 'plinko', 'roulette']);
+const PLAY_GAMES = new Set(['mines', 'penalty', 'plinko']);
 const limitOf = (req, def = 30, max = 100) => Math.min(max, Math.max(1, parseInt(req.query.limit, 10) || def));
 
 module.exports = function publicRoutes(ctx) {
-  const { db, auth, wallet, settings, chains, bus, limiter, plays, seeds, double, doubleChains } = ctx;
+  const { db, auth, wallet, settings, chains, bus, limiter, plays, seeds, double, doubleChains, roulette, rouletteChains } = ctx;
+  const LIVE = {
+    double: { engine: double, chains: doubleChains, table: 'double', betCols: 'b.color' },
+    roulette: { engine: roulette, chains: rouletteChains, table: 'roulette', betCols: 'b.bets' },
+  };
   const router = express.Router();
   const ipOf = (req) => clientIp(req.headers, req.socket.remoteAddress);
 
@@ -255,26 +259,31 @@ module.exports = function publicRoutes(ctx) {
   });
 
   router.get('/fair', (req, res) => {
-    res.json(req.query.game === 'double' ? doubleChains.publicInfo() : chains.publicInfo());
+    const live = LIVE[req.query.game];
+    res.json(live ? live.chains.publicInfo() : chains.publicInfo());
   });
 
   router.get('/top', (req, res) => {
     const periodName = req.query.period;
     const today = startOfDay();
     const since = periodName === 'week' ? today - 6 * DAY : periodName === 'month' ? today - 29 * DAY : today;
-    // Ganancias de todos los juegos. round_id = ronda (Crash y Double) o número de jugada (los demás).
+    // Ganancias de todos los juegos (solo cuando se cobró más de lo apostado).
+    // round_id = ronda (Crash, Double y Ruleta) o número de jugada (los demás).
     const base = `SELECT * FROM (
         SELECT 'crash' AS game, b.round_id, b.amount, b.cashout, b.payout, u.username AS user
         FROM bets b JOIN users u ON u.id = b.user_id WHERE b.status = 'won' AND b.created_at >= ?
         UNION ALL
         SELECT p.game, p.id, p.amount, p.multiplier, p.payout, u.username
-        FROM plays p JOIN users u ON u.id = p.user_id WHERE p.status = 'won' AND p.ended_at >= ?
+        FROM plays p JOIN users u ON u.id = p.user_id WHERE p.status = 'won' AND p.payout > p.amount AND p.ended_at >= ?
         UNION ALL
         SELECT 'double', d.round_id, d.amount, (d.payout * 100) / d.amount, d.payout, u.username
         FROM double_bets d JOIN users u ON u.id = d.user_id WHERE d.status = 'won' AND d.created_at >= ?
+        UNION ALL
+        SELECT 'roulette', r.round_id, r.amount, (r.payout * 100) / r.amount, r.payout, u.username
+        FROM roulette_bets r JOIN users u ON u.id = r.user_id WHERE r.status = 'won' AND r.payout > r.amount AND r.created_at >= ?
       )`;
-    const wins = db.all(`${base} ORDER BY (payout - amount) DESC LIMIT 15`, since, since, since);
-    const multipliers = db.all(`${base} ORDER BY cashout DESC, payout DESC LIMIT 15`, since, since, since);
+    const wins = db.all(`${base} ORDER BY (payout - amount) DESC LIMIT 15`, since, since, since, since);
+    const multipliers = db.all(`${base} ORDER BY cashout DESC, payout DESC LIMIT 15`, since, since, since, since);
     const rounds = db.all(
       "SELECT id, crash_point FROM rounds WHERE status = 'crashed' AND ended_at >= ? ORDER BY crash_point DESC LIMIT 15",
       since,
@@ -282,12 +291,12 @@ module.exports = function publicRoutes(ctx) {
     res.json({ wins, multipliers, rounds });
   });
 
-  // ───────────────────────── Juegos con semillas (Minas, Penales, Plinko, Ruleta) ─────────────────────────
+  // ───────────────────────── Juegos con semillas (Minas, Penales, Plinko) ─────────────────────────
 
   router.get('/plays', requireUser, (req, res) => {
     const game = String(req.query.game || '');
     const limit = limitOf(req);
-    if (game === 'double') return res.json({ items: double.userHistory(req.user.id, limit) });
+    if (LIVE[game]) return res.json({ items: LIVE[game].engine.userHistory(req.user.id, limit) });
     if (game && !PLAY_GAMES.has(game)) throw new AppError('Juego inválido');
     res.json({ items: plays.history(req.user.id, game || null, limit) });
   });
@@ -308,56 +317,71 @@ module.exports = function publicRoutes(ctx) {
     res.json(seeds.rotate(req.user.id, (req.body || {}).clientSeed));
   });
 
-  // ───────────────────────── 🎡 Double ─────────────────────────
+  // ───────────────────────── 🎡 Double y 🎰 Ruleta (en vivo) ─────────────────────────
 
-  router.get('/double/rounds', (req, res) => {
-    // played=1 → solo las rondas que se jugaron (sin las anuladas antes de girar)
-    const statuses = req.query.played === '1' ? "('ended')" : "('ended', 'cancelled')";
-    const items = db.all(
-      `SELECT id, chain_id, chain_index, hash, result, status, ended_at, total_bet, total_payout, players
-       FROM double_rounds WHERE status IN ${statuses} ORDER BY id DESC LIMIT ?`,
-      limitOf(req, 50, 200),
-    );
-    res.json({ items });
-  });
+  const parseBets = (text) => {
+    try {
+      const list = JSON.parse(text || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch {
+      return [];
+    }
+  };
 
-  router.get('/double/rounds/:id', (req, res) => {
-    const id = parseInt(req.params.id, 10);
-    const r = Number.isSafeInteger(id) ? db.get('SELECT * FROM double_rounds WHERE id = ?', id) : null;
-    if (!r) throw new AppError('Ronda no encontrada', 404);
-    if (r.status !== 'ended' && r.status !== 'cancelled') return res.json({ round: { id: r.id, status: r.status } });
-    const chain = db.get('SELECT id, salt, house_edge_bps, terminal_hash, length FROM chains WHERE id = ?', r.chain_id);
-    const previous = db.get(
-      "SELECT id, hash FROM double_rounds WHERE chain_id = ? AND chain_index = ? AND status IN ('ended', 'cancelled')",
-      r.chain_id,
-      r.chain_index - 1,
-    );
-    const bets = db.all(
-      `SELECT b.id, b.color, b.amount, b.payout, b.status, u.username AS user
-       FROM double_bets b JOIN users u ON u.id = b.user_id
-       WHERE b.round_id = ? AND b.status IN ('won', 'lost', 'refunded')
-       ORDER BY b.amount DESC LIMIT 300`,
-      r.id,
-    );
-    res.json({
-      round: {
-        id: r.id,
-        chain_id: r.chain_id,
-        chain_index: r.chain_index,
-        hash: r.hash,
-        result: r.result,
-        status: r.status,
-        spun_at: r.spun_at,
-        ended_at: r.ended_at,
-        total_bet: r.total_bet,
-        total_payout: r.total_payout,
-        players: r.players,
-      },
-      chain,
-      previous: previous || null,
-      bets,
+  for (const [game, live] of Object.entries(LIVE)) {
+    const { table, betCols } = live;
+
+    router.get(`/${game}/rounds`, (req, res) => {
+      // played=1 → solo las rondas que se jugaron (sin las anuladas antes de girar)
+      const statuses = req.query.played === '1' ? "('ended')" : "('ended', 'cancelled')";
+      const items = db.all(
+        `SELECT id, chain_id, chain_index, hash, result, status, ended_at, total_bet, total_payout, players
+         FROM ${table}_rounds WHERE status IN ${statuses} ORDER BY id DESC LIMIT ?`,
+        limitOf(req, 50, 200),
+      );
+      res.json({ items });
     });
-  });
+
+    router.get(`/${game}/rounds/:id`, (req, res) => {
+      const id = parseInt(req.params.id, 10);
+      const r = Number.isSafeInteger(id) ? db.get(`SELECT * FROM ${table}_rounds WHERE id = ?`, id) : null;
+      if (!r) throw new AppError('Ronda no encontrada', 404);
+      if (r.status !== 'ended' && r.status !== 'cancelled') return res.json({ round: { id: r.id, status: r.status } });
+      const chain = db.get('SELECT id, salt, house_edge_bps, terminal_hash, length FROM chains WHERE id = ?', r.chain_id);
+      const previous = db.get(
+        `SELECT id, hash FROM ${table}_rounds WHERE chain_id = ? AND chain_index = ? AND status IN ('ended', 'cancelled')`,
+        r.chain_id,
+        r.chain_index - 1,
+      );
+      const bets = db
+        .all(
+          `SELECT b.id, ${betCols}, b.amount, b.payout, b.status, u.username AS user
+           FROM ${table}_bets b JOIN users u ON u.id = b.user_id
+           WHERE b.round_id = ? AND b.status IN ('won', 'lost', 'refunded')
+           ORDER BY b.amount DESC LIMIT 300`,
+          r.id,
+        )
+        .map((b) => (b.bets !== undefined ? { ...b, bets: parseBets(b.bets) } : b));
+      res.json({
+        round: {
+          id: r.id,
+          chain_id: r.chain_id,
+          chain_index: r.chain_index,
+          hash: r.hash,
+          result: r.result,
+          status: r.status,
+          spun_at: r.spun_at,
+          ended_at: r.ended_at,
+          total_bet: r.total_bet,
+          total_payout: r.total_payout,
+          players: r.players,
+        },
+        chain,
+        previous: previous || null,
+        bets,
+      });
+    });
+  }
 
   return router;
 };

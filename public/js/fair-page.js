@@ -1,8 +1,9 @@
 import { $, $$, h, api, fmtMult, fmtNum, fmtDate, multClass, sha256Hex, hmacSha256Hex, crashFromHash, copyText } from './shared.js';
-import { core, playVisual, recompute, GAME_BY_ID, DOUBLE_COLORS } from './games/common.js';
+import { core, playVisual, recompute, GAME_BY_ID, DOUBLE_COLORS, ROULETTE_COLOR_NAMES } from './games/common.js';
 
 let fair = null;
 let dfair = null;
+let rfair = null;
 
 // ───────────────────────── Pestañas ─────────────────────────
 
@@ -165,10 +166,11 @@ const tileBadge = (n) => {
   return h('span', { class: `dtile ${c}`, title: DOUBLE_COLORS[c] }, c === 'white' ? '★' : String(n));
 };
 
-function renderDoubleChain(info) {
+/** Cadena de un juego en vivo (Double o Ruleta): prefix = 'd' o 'r' (ids #dChainInfo, #rChainInfo...). */
+function renderLiveChain(info, prefix, pays) {
   const c = info.current;
   const pct = c.length ? (c.used / c.length) * 100 : 0;
-  $('#dChainInfo').replaceChildren(
+  $(`#${prefix}ChainInfo`).replaceChildren(
     h(
       'dl',
       { class: 'chain-grid' },
@@ -177,7 +179,7 @@ function renderDoubleChain(info) {
       h('dt', null, 'Sal (salt)'),
       h('dd', null, h('span', { class: 'mono' }, c.salt), ' ', copyBtn(c.salt)),
       h('dt', null, 'Pagos'),
-      h('dd', null, 'Rojo 2x · Negro 2x · Blanco 30x · RTP 96,77%'),
+      h('dd', null, pays),
       h('dt', null, 'Rondas jugadas'),
       h('dd', null, `${fmtNum(c.used)} de ${fmtNum(c.length)}`, h('div', { class: 'progress' }, h('div', { style: { width: `${Math.max(0.5, pct)}%` } }))),
       h('dt', null, 'Publicada'),
@@ -185,8 +187,8 @@ function renderDoubleChain(info) {
     ),
   );
   if (info.previous && info.previous.length) {
-    $('#dPrevCard').hidden = false;
-    $('#dPrevChains').replaceChildren(
+    $(`#${prefix}PrevCard`).hidden = false;
+    $(`#${prefix}PrevChains`).replaceChildren(
       ...info.previous.map((p) =>
         h(
           'div',
@@ -269,6 +271,66 @@ $('#dVerifyForm').addEventListener('submit', (e) => {
   verifyDouble();
 });
 
+// ───────────────────────── 🎰 Ruleta ─────────────────────────
+
+const rouletteNumber = (hash, salt) => core.rouletteNumberFromHmac(hmacSha256Hex(salt, hash));
+const numberBadge = (n) => h('span', { class: `rnum ${core.rouletteColor(n)}`, title: ROULETTE_COLOR_NAMES[core.rouletteColor(n)] }, String(n));
+
+function verifyRoulette() {
+  const out = $('#rVerifyOut');
+  const hash = $('#rHash').value.trim().toLowerCase();
+  const salt = $('#rSalt').value.trim();
+  const count = Math.min(500, Math.max(1, parseInt($('#rCount').value, 10) || 20));
+  if (!/^[0-9a-f]{64}$/.test(hash)) {
+    out.replaceChildren(h('div', { class: 'status-line bad' }, 'El hash tiene que tener 64 caracteres hexadecimales (0-9, a-f).'));
+    return;
+  }
+  if (!salt) {
+    out.replaceChildren(h('div', { class: 'status-line bad' }, 'Ingresá la sal (salt) de la cadena de la Ruleta.'));
+    return;
+  }
+  const n = rouletteNumber(hash, salt);
+  const color = core.rouletteColor(n);
+  const rows = [];
+  let current = hash;
+  for (let i = 0; i < count; i++) {
+    const t = rouletteNumber(current, salt);
+    rows.push(h('tr', null, h('td', null, i === 0 ? 'Esta ronda' : `−${i}`), h('td', { class: 'mono' }, current), h('td', { class: 'num' }, numberBadge(t))));
+    current = sha256Hex(current);
+  }
+  const chainStatus = h('div', { class: 'status-line', hidden: true });
+  const walkBtn = h('button', { class: 'btn btn-ghost btn-block', type: 'button' }, '🔗 Comprobar que pertenece a la cadena publicada');
+  walkBtn.addEventListener('click', () => walkChains(hash, rfair, walkBtn, chainStatus));
+  const facts = [
+    n === 0 ? 'cero' : n % 2 ? 'impar' : 'par',
+    n === 0 ? null : n <= 18 ? '1 a 18' : '19 a 36',
+    n === 0 ? null : `${Math.ceil(n / 12)}ª docena`,
+    n === 0 ? null : `${((n - 1) % 3) + 1}ª columna`,
+  ].filter(Boolean);
+  out.replaceChildren(
+    h(
+      'div',
+      null,
+      h(
+        'div',
+        { class: 'result-hero' },
+        h('small', null, 'Número ganador'),
+        h('div', { class: `big rbig ${color}` }, String(n)),
+        h('small', null, `${ROULETTE_COLOR_NAMES[color]} · ${facts.join(' · ')}`),
+      ),
+      h('p', { class: 'muted' }, 'Rondas anteriores (cada hash es el SHA-256 del de arriba). Compará con el historial del juego:'),
+      h('div', { class: 'table-wrap' }, h('table', { class: 'table prev-table' }, h('thead', null, h('tr', null, h('th', null, 'Ronda'), h('th', null, 'Hash'), h('th', { class: 'num' }, 'Número'))), h('tbody', null, ...rows))),
+      rfair ? walkBtn : null,
+      chainStatus,
+    ),
+  );
+}
+
+$('#rVerifyForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  verifyRoulette();
+});
+
 // ───────────────────────── 🎲 Juegos con semillas ─────────────────────────
 
 const RISKS = { low: 'bajo', medium: 'medio', high: 'alto' };
@@ -289,8 +351,6 @@ function sampleFor(game, params, r) {
       return { game, params, kicks: [], keepers: r.keepers };
     case 'plinko':
       return { game, params, path: r.path, bucket: r.bucket };
-    case 'roulette':
-      return { game, params: { bets: [] }, number: r.number };
     default:
       return null;
   }
@@ -306,8 +366,6 @@ function describe(game, params, r, short = false) {
       return `El arquero se tira: ${r.keepers.map((k) => ['izquierda', 'centro', 'derecha'][k]).join(' · ')}`;
     case 'plinko':
       return `La bolita cae en la casilla ${r.bucket + 1} de ${params.rows + 1} → ${fmtMult(r.multiplier)} (riesgo ${RISKS[params.risk]})`;
-    case 'roulette':
-      return `Sale el ${r.number} (${core.rouletteColor(r.number) === 'red' ? 'rojo' : core.rouletteColor(r.number) === 'black' ? 'negro' : 'verde'})`;
     default:
       return '';
   }
@@ -409,7 +467,6 @@ async function loadPlay(id) {
       mines: (r) => JSON.stringify(r.mines) === JSON.stringify(p.mines),
       penalty: (r) => JSON.stringify(r.keepers) === JSON.stringify(p.keepers),
       plinko: (r) => JSON.stringify(r.path) === JSON.stringify(p.path),
-      roulette: (r) => r.number === p.number,
     }[p.game];
     verifySeeds({ id: p.id, hash: seed.serverHash, check: same });
   } catch (err) {
@@ -422,7 +479,7 @@ async function loadPlay(id) {
 async function init() {
   const params = new URLSearchParams(location.search);
   const game = params.get('game') || 'crash';
-  const tab = game === 'double' ? 'double' : game === 'crash' ? 'crash' : 'seeds';
+  const tab = ['crash', 'double', 'roulette'].includes(game) ? game : 'seeds';
   showTab(tab);
   try {
     fair = await api('/api/fair');
@@ -434,10 +491,17 @@ async function init() {
   }
   try {
     dfair = await api('/api/fair?game=double');
-    renderDoubleChain(dfair);
+    renderLiveChain(dfair, 'd', 'Rojo 2x · Negro 2x · Blanco 30x · RTP 96,77%');
     $('#dSalt').value = dfair.current.salt;
   } catch (err) {
     $('#dChainInfo').replaceChildren(h('div', { class: 'empty' }, err.message));
+  }
+  try {
+    rfair = await api('/api/fair?game=roulette');
+    renderLiveChain(rfair, 'r', 'Pleno 36x · Docena y columna 3x · Rojo, negro, par, impar, 1-18 y 19-36 2x · RTP 97,30%');
+    $('#rSalt').value = rfair.current.salt;
+  } catch (err) {
+    $('#rChainInfo').replaceChildren(h('div', { class: 'empty' }, err.message));
   }
   if (tab === 'crash') {
     if (params.get('salt')) $('#vSalt').value = params.get('salt');
@@ -454,8 +518,15 @@ async function init() {
       verifyDouble();
       $('#dVerifyForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+  } else if (tab === 'roulette') {
+    if (params.get('salt')) $('#rSalt').value = params.get('salt');
+    if (params.get('hash')) {
+      $('#rHash').value = params.get('hash');
+      verifyRoulette();
+      $('#rVerifyForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   } else {
-    if (['mines', 'penalty', 'plinko', 'roulette'].includes(game)) $('#sGame').value = game;
+    if (['mines', 'penalty', 'plinko'].includes(game)) $('#sGame').value = game;
     syncSeedOptions();
     if (params.get('server')) $('#sServer').value = params.get('server');
     if (params.get('client')) $('#sClient').value = params.get('client');

@@ -25,6 +25,7 @@ const { GameEngine } = require('./game');
 const { Seeds } = require('./games/seeds');
 const { PlayEngine } = require('./games/plays');
 const { DoubleEngine } = require('./games/double');
+const { RouletteEngine } = require('./games/roulette');
 const { BotManager } = require('./bots');
 const { Backups } = require('./backup');
 const { AppError, RateLimiter, randomPassword } = require('./util');
@@ -46,15 +47,20 @@ const chat = new Chat({ db, bus, settings });
 const engine = new GameEngine({ db, chains, settings, wallet, bus });
 const backups = new Backups(db, config.DATA_DIR);
 engine.on('betting', () => setImmediate(() => backups.maybeAuto()));
-// Los demás juegos: Minas, Penales, Plinko y Ruleta (semillas de cada jugador) y el Double (cadena propia)
+// Minas, Penales y Plinko: cada jugada sale de las semillas del jugador
 const seeds = new Seeds(db);
 const plays = new PlayEngine({ db, wallet, settings, bus, seeds });
+// Double y Ruleta: en vivo, cada uno con su propia cadena de hashes.
 // Ventaja del Double: 3,23% (31 casillas; rojo y negro pagan 2x, blanco 30x). Se guarda solo como dato.
 const doubleChains = new ChainManager(db, { game: 'double', length: config.CHAIN_LENGTH, defaultEdgeBps: 323 });
 doubleChains.init();
 const double = new DoubleEngine({ db, chains: doubleChains, settings, wallet, bus });
+// Ventaja de la Ruleta europea: 2,70% (un solo cero). También se guarda solo como dato.
+const rouletteChains = new ChainManager(db, { game: 'roulette', length: config.CHAIN_LENGTH, defaultEdgeBps: 270 });
+rouletteChains.init();
+const roulette = new RouletteEngine({ db, chains: rouletteChains, settings, wallet, bus });
 // Bots marcados con 🤖 que animan la sala con plata ficticia (no tocan nada real)
-const bots = new BotManager({ db, engine, double, chat, settings, bus });
+const bots = new BotManager({ db, engine, double, roulette, chat, settings, bus });
 const limiter = new RateLimiter();
 const ctx = {
   db,
@@ -69,6 +75,8 @@ const ctx = {
   plays,
   double,
   doubleChains,
+  roulette,
+  rouletteChains,
   bots,
   backups,
   limiter,
@@ -187,6 +195,7 @@ async function main() {
   await ensureAdmin();
   engine.start();
   double.start();
+  roulette.start();
   bots.start();
   server.listen(config.PORT, config.HOST, () => {
     console.log(`\n🚀 CrashPY está en línea`);
@@ -219,6 +228,7 @@ function shutdown(signal) {
   console.log(`\n⏹️  Apagando (${signal})... las apuestas de la ronda en curso se devuelven.`);
   engine.shutdown();
   double.shutdown();
+  roulette.shutdown();
   bots.shutdown();
   io.close();
   server.close();

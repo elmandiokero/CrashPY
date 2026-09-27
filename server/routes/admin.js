@@ -6,6 +6,7 @@ const { AppError, cleanText, clientIp, fmtGs, fmtMult } = require('../util');
 const { hashPassword, requireAdmin } = require('../auth');
 const stats = require('../stats');
 const core = require('../../public/js/games-core.js');
+const { spotsLabel } = require('../games/roulette');
 
 const PAGE = 50;
 const USER_SORTS = {
@@ -35,10 +36,14 @@ const parseJSON = (s) => {
   }
 };
 const COLOR_NAMES = { red: '🔴 rojo', black: '⚫ negro', white: '⚪ blanco' };
+const ROULETTE_EMOJI = { red: '🔴', black: '⚫', green: '🟢' };
 const RISK_NAMES = { low: 'bajo', medium: 'medio', high: 'alto' };
 const GAME_KEYS = new Set(['mines', 'penalty', 'plinko', 'roulette', 'double']);
 
-/** Jugadas de todos los juegos (menos el Crash, que tiene su propia tabla) con la misma forma. */
+/**
+ * Jugadas de todos los juegos (menos el Crash, que tiene su propia tabla) con la misma forma.
+ * En la Ruleta, "params" son las fichas de la apuesta. El resultado de una ronda se muestra recién cuando empezó a girar.
+ */
 const UNIFIED_PLAYS = `
   SELECT p.id, p.game, p.user_id, p.amount, p.multiplier, p.payout, p.status, p.created_at, p.ended_at,
          p.params, p.state, p.result, NULL AS color, NULL AS round_id, NULL AS round_result
@@ -48,7 +53,13 @@ const UNIFIED_PLAYS = `
          CASE WHEN d.status = 'won' THEN (d.payout * 100) / d.amount ELSE 0 END,
          d.payout, d.status, d.created_at, r.ended_at, NULL, NULL, NULL, d.color, d.round_id,
          CASE WHEN r.status IN ('spinning', 'ended', 'cancelled') THEN r.result END
-  FROM double_bets d JOIN double_rounds r ON r.id = d.round_id`;
+  FROM double_bets d JOIN double_rounds r ON r.id = d.round_id
+  UNION ALL
+  SELECT b.id, 'roulette', b.user_id, b.amount,
+         CASE WHEN b.status = 'won' THEN (b.payout * 100) / b.amount ELSE 0 END,
+         b.payout, b.status, b.created_at, r.ended_at, b.bets, NULL, NULL, NULL, b.round_id,
+         CASE WHEN r.status IN ('spinning', 'ended', 'cancelled') THEN r.result END
+  FROM roulette_bets b JOIN roulette_rounds r ON r.id = b.round_id`;
 
 /** Resumen corto de la jugada para las tablas del panel (nunca muestra el resultado de una partida en curso). */
 function describePlay(row) {
@@ -68,8 +79,10 @@ function describePlay(row) {
     case 'plinko':
       return `${params.rows} filas · riesgo ${RISK_NAMES[params.risk] || params.risk}`;
     case 'roulette': {
-      const n = (params.bets || []).length;
-      return `${n} apuesta${n === 1 ? '' : 's'}${row.status !== 'active' && result.number !== undefined ? ` · salió ${result.number}` : ''}`;
+      const spots = Array.isArray(params) ? params : params.bets || [];
+      const n = row.round_result ?? result.number;
+      const shown = n !== null && n !== undefined && row.status !== 'refunded';
+      return `${spotsLabel(spots, 2) || 'sin fichas'}${shown ? ` · salió el ${n} ${ROULETTE_EMOJI[core.rouletteColor(n)]}` : ''}`;
     }
     case 'double':
       return `${COLOR_NAMES[row.color] || row.color}${
@@ -96,7 +109,7 @@ const playView = (row) => ({
 });
 
 module.exports = function adminRoutes(ctx) {
-  const { db, auth, wallet, settings, chains, engine, chat, bus, double, doubleChains } = ctx;
+  const { db, auth, wallet, settings, chains, engine, chat, bus, double, doubleChains, roulette, rouletteChains } = ctx;
   const router = express.Router();
   router.use(requireAdmin);
 
@@ -127,8 +140,10 @@ module.exports = function adminRoutes(ctx) {
       charts: stats.charts(db),
       game: engine.adminState(),
       double: double.adminState(),
+      roulette: roulette.adminState(),
       fair: chains.summary(),
       doubleFair: doubleChains.summary(),
+      rouletteFair: rouletteChains.summary(),
       online: ctx.presence ? ctx.presence.list().length : 0,
       connections: ctx.presence ? ctx.presence.connections() : 0,
     });
@@ -436,6 +451,16 @@ module.exports = function adminRoutes(ctx) {
       pageOf(req) * PAGE,
     );
     res.json({ double: double.adminState(), fair: doubleChains.summary(), items });
+  });
+
+  router.get('/roulette', (req, res) => {
+    const items = db.all(
+      `SELECT id, chain_id, chain_index, hash, result, status, spun_at, ended_at, total_bet, total_payout, total_refund, players
+       FROM roulette_rounds WHERE status IN ('ended', 'cancelled') ORDER BY id DESC LIMIT ? OFFSET ?`,
+      PAGE,
+      pageOf(req) * PAGE,
+    );
+    res.json({ roulette: roulette.adminState(), fair: rouletteChains.summary(), items });
   });
 
   router.post('/game/stop', (req, res) => {

@@ -49,8 +49,9 @@ const CHAT = {
     mines: ['💣 Saqué {m} en Minas 💎', 'Diamantes y afuera: {m} 💎'],
     penalty: ['⚽ ¡Golazo! {m} en los penales', 'La Albirroja no perdona: {m} ⚽🇵🇾'],
     plinko: ['🔴 La bolita cayó en {m} 😱', 'Plinko {m} 🔥'],
-    roulette: ['🎰 ¡Salió mi número! {m}', 'La ruleta me quiere hoy 🎰'],
   },
+  pleno: ['🎰 ¡Pleno al {n}! 🔥', '¡Salió mi {n}! 😱', 'Le pegué al {n} 🎯', 'Sabía que salía el {n} 🎰'],
+  zero: ['Cero... 😅', 'El verde otra vez 🟢', 'Nadie tenía el 0? 👀', 'Salió el cero, qué bronca 😂'],
   cheer: ['¡Grande {u}! 🔥', 'Vamos {u} 👏', 'Qué crack {u} 🙌'],
 };
 
@@ -99,12 +100,47 @@ function localDay(offsetDays = 0) {
 
 const GAMES = ['crash', 'double', 'mines', 'penalty', 'plinko', 'roulette'];
 
+// Números que la gente suele jugar en la ruleta (cumpleaños, el 7, el 17...)
+const LUCKY = [7, 17, 23, 0, 11, 13, 21, 27, 32, 9, 3, 19, 36, 1, 14, 22, 5, 29, 31, 8];
+
+/** Fichas de un bot para la ruleta: casi siempre afuera (colores, docenas), a veces algunos plenos. */
+function rouletteSpots() {
+  const style = weighted([
+    ['color', 34],
+    ['numbers', 20],
+    ['mixed', 18],
+    ['dozens', 14],
+    ['even', 14],
+  ]);
+  const num = () => (chance(0.6) ? pick(LUCKY) : Math.floor(rand() * 37));
+  const spots = [];
+  const add = (type, value = null, scale = 1) => spots.push({ type, value, scale });
+  if (style === 'color') add(pick(['red', 'black']));
+  else if (style === 'numbers') {
+    const k = pick([1, 2, 3, 3, 4, 5]);
+    const used = new Set();
+    while (used.size < k) used.add(num());
+    for (const n of used) add('n', n, 0.2);
+  } else if (style === 'mixed') {
+    add(pick(['red', 'black']));
+    add('n', num(), 0.2);
+    if (chance(0.5)) add('dozen', 1 + Math.floor(rand() * 3), 0.6);
+  } else if (style === 'dozens') {
+    const kind = chance(0.7) ? 'dozen' : 'column';
+    const first = 1 + Math.floor(rand() * 3);
+    add(kind, first);
+    if (chance(0.45)) add(kind, (first % 3) + 1);
+  } else add(pick(['odd', 'even', 'low', 'high']));
+  return spots;
+}
+
 class BotManager extends EventEmitter {
-  constructor({ db, engine, double, chat, settings, bus, log = console.log }) {
+  constructor({ db, engine, double, roulette, chat, settings, bus, log = console.log }) {
     super();
     this.db = db;
     this.engine = engine;
     this.double = double;
+    this.roulette = roulette;
     this.chat = chat;
     this.settings = settings;
     this.bus = bus;
@@ -118,6 +154,7 @@ class BotManager extends EventEmitter {
     this.seq = 0;
     this.crash = { roundId: null, bets: new Map(), timers: [] };
     this.dbl = { roundId: null, bets: new Map(), timers: [] };
+    this.rl = { roundId: null, bets: new Map(), timers: [] };
     this.soloTimer = null;
     this.chatTimer = null;
     this.lastChat = 0;
@@ -138,6 +175,10 @@ class BotManager extends EventEmitter {
     this.double.on('spin', () => this._safe(() => this._clearTimers(this.dbl)));
     this.double.on('result', (d) => this._safe(() => this._doubleResult(d)));
     this.double.on('refund', () => this._safe(() => this._doubleRefund()));
+    this.roulette.on('betting', (d) => this._safe(() => this._rouletteBetting(d)));
+    this.roulette.on('spin', () => this._safe(() => this._clearTimers(this.rl)));
+    this.roulette.on('result', (d) => this._safe(() => this._rouletteResult(d)));
+    this.roulette.on('refund', () => this._safe(() => this._rouletteRefund()));
     this.bus.on('bigwin', (w) => this._safe(() => this._cheer(w)));
     this._scheduleSolo();
     this._scheduleChat();
@@ -170,6 +211,7 @@ class BotManager extends EventEmitter {
     if (!want) {
       this._clearTimers(this.crash);
       this._clearTimers(this.dbl);
+      this._clearTimers(this.rl);
     }
     this.emit('online', this.roster.length);
     // Uno de los que llegan saluda
@@ -398,7 +440,89 @@ class BotManager extends EventEmitter {
     return [...this.dbl.bets.values()].map((b) => ({ ...b }));
   }
 
-  // ───────────────────────── 💣 ⚽ 🔴 🎰 Juegos individuales ─────────────────────────
+  // ───────────────────────── 🎰 Ruleta ─────────────────────────
+
+  _rouletteBetting({ roundId, ms }) {
+    this._clearTimers(this.rl);
+    this.rl.roundId = roundId;
+    this.rl.bets = new Map();
+    if (!this.enabled) return;
+    const share = between(0.25, 0.6);
+    for (const bot of this.roster) {
+      if (!chance(share)) continue;
+      const times = weighted([
+        [1, 70],
+        [2, 22],
+        [3, 8],
+      ]);
+      for (let k = 0; k < times; k++) {
+        const at = between(500, Math.max(700, ms - 900));
+        this.rl.timers.push(setTimeout(() => this._safe(() => this._roulettePlace(bot, roundId)), at));
+      }
+    }
+  }
+
+  _roulettePlace(bot, roundId) {
+    const r = this.roulette.round;
+    if (!this.enabled || this.roulette.phase !== 'BETTING' || !r || r.id !== roundId) return;
+    const add = rouletteSpots().map((s) => ({ type: s.type, value: s.value, amount: this._amount(s.scale) }));
+    const extra = add.reduce((t, s) => t + s.amount, 0);
+    let b = this.rl.bets.get(bot.uid);
+    if (b && b.amount + extra > this.settings.get('max_bet')) return;
+    if (!b) {
+      b = { id: `b${++this.seq}`, uid: bot.uid, user: bot.name, amount: 0, bets: [], status: 'active', payout: 0, bot: true };
+      this.rl.bets.set(bot.uid, b);
+    }
+    for (const s of add) {
+      const same = b.bets.find((x) => x.type === s.type && x.value === s.value);
+      if (same) same.amount += s.amount;
+      else b.bets.push(s);
+    }
+    b.amount += extra;
+    this.emit('roulette:bet', this._roulettePublic(b));
+  }
+
+  _rouletteResult({ roundId, result }) {
+    if (roundId !== this.rl.roundId) return;
+    const maxProfit = this.settings.get('max_profit');
+    let plays = 0;
+    let bet = 0;
+    let payout = 0;
+    let pleno = null;
+    for (const b of this.rl.bets.values()) {
+      plays++;
+      bet += b.amount;
+      b.payout = Math.min(core.roulettePayout(b.bets, result), b.amount + maxProfit);
+      b.status = b.payout > 0 ? 'won' : 'lost';
+      payout += b.payout;
+      if (!pleno && b.bets.some((s) => s.type === 'n' && s.value === result)) pleno = b;
+    }
+    this._record('roulette', plays, bet, payout);
+    if (!this.enabled) return;
+    if (pleno && chance(0.5)) {
+      const bot = this.roster.find((x) => x.uid === pleno.uid);
+      setTimeout(() => this._say(bot, fill(pick(CHAT.pleno), { n: result })), between(1200, 3000));
+    } else if (result === 0 && chance(0.35)) {
+      setTimeout(() => this._say(pick(this.roster), pick(CHAT.zero)), between(1200, 3000));
+    }
+  }
+
+  _rouletteRefund() {
+    this._clearTimers(this.rl);
+    this.rl.bets = new Map();
+  }
+
+  _roulettePublic(b) {
+    return { id: b.id, uid: b.uid, user: b.user, amount: b.amount, bets: b.bets.map((s) => ({ ...s })), status: b.status, payout: b.payout, bot: true };
+  }
+
+  rouletteBets() {
+    const r = this.roulette.round;
+    if (!r || r.id !== this.rl.roundId) return [];
+    return [...this.rl.bets.values()].map((b) => this._roulettePublic(b));
+  }
+
+  // ───────────────────────── 💣 ⚽ 🔴 Juegos individuales ─────────────────────────
 
   _scheduleSolo() {
     clearTimeout(this.soloTimer);
@@ -415,10 +539,9 @@ class BotManager extends EventEmitter {
   _soloPlay() {
     if (!this.enabled) return;
     const options = [
-      ['plinko', 34],
-      ['mines', 26],
-      ['roulette', 22],
-      ['penalty', 18],
+      ['plinko', 42],
+      ['mines', 34],
+      ['penalty', 24],
     ].filter(([g]) => this.settings.get('game_' + g) !== false);
     if (!options.length) return;
     const game = weighted(options);
@@ -441,31 +564,14 @@ class BotManager extends EventEmitter {
       const tiles = shuffle([...Array(25).keys()]);
       const hit = tiles.slice(0, want).some((t) => bombs.has(t));
       multiplier = hit ? 0 : core.minesMultiplier(mines, want);
-    } else if (game === 'penalty') {
+    } else {
       const want = pick([1, 1, 2, 2, 2, 3, 3, 4, 5]);
       const keepers = core.penaltyKeepers(floats(core.PENALTY_KICKS));
       let saved = false;
       for (let k = 0; k < want && !saved; k++) if (Math.floor(rand() * 3) === keepers[k]) saved = true;
       multiplier = saved ? 0 : core.penaltyMultiplier(want);
-    } else {
-      const n = core.rouletteNumber(floats(1));
-      const type = weighted([
-        ['color', 40],
-        ['n', 18],
-        ['dozen', 17],
-        ['parity', 15],
-        ['half', 10],
-      ]);
-      let bet;
-      if (type === 'color') bet = { type: pick(['red', 'black']) };
-      else if (type === 'n') bet = { type: 'n', value: Math.floor(rand() * 37) };
-      else if (type === 'dozen') bet = { type: 'dozen', value: 1 + Math.floor(rand() * 3) };
-      else if (type === 'parity') bet = { type: pick(['odd', 'even']) };
-      else bet = { type: pick(['low', 'high']) };
-      payout = core.roulettePayout([{ ...bet, amount }], n);
-      multiplier = Math.floor((payout * 100) / amount);
     }
-    if (game !== 'roulette') payout = Math.floor((amount * multiplier) / 100);
+    payout = Math.floor((amount * multiplier) / 100);
     const cap = amount + this.settings.get('max_profit');
     if (payout > cap) {
       payout = cap;
