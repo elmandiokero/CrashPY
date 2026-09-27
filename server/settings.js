@@ -28,6 +28,12 @@ const SCHEMA = {
   bigwin_multiplier: { type: 'float', min: 1.01, max: 1e6, def: 10, public: false, label: 'Anunciar retiros desde (x)' },
   bigwin_amount: { type: 'int', min: 0, max: 1e12, def: 200000, public: false, label: 'Anunciar ganancias desde (Gs.)' },
   signup_bonus: { type: 'int', min: 0, max: 1e9, def: 0, public: false, label: 'Bono de bienvenida' },
+  game_mines: { type: 'bool', def: true, public: true, label: '💣 Minas habilitado' },
+  game_penalty: { type: 'bool', def: true, public: true, label: '⚽ Penales habilitado' },
+  game_double: { type: 'bool', def: true, public: true, label: '🎡 Double habilitado' },
+  game_plinko: { type: 'bool', def: true, public: true, label: '🔴 Plinko habilitado' },
+  game_roulette: { type: 'bool', def: true, public: true, label: '🎰 Ruleta habilitada' },
+  double_betting_seconds: { type: 'int', min: 5, max: 30, def: 15, public: true, label: 'Double: segundos para apostar' },
 };
 
 class Settings {

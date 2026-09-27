@@ -5,9 +5,11 @@ const { hashPassword, verifyPassword, requireUser, publicUser } = require('../au
 
 const USERNAME_RE = /^[a-zA-Z0-9_.]{3,16}$/;
 const DAY = 86_400_000;
+const PLAY_GAMES = new Set(['mines', 'penalty', 'plinko', 'roulette']);
+const limitOf = (req, def = 30, max = 100) => Math.min(max, Math.max(1, parseInt(req.query.limit, 10) || def));
 
 module.exports = function publicRoutes(ctx) {
-  const { db, auth, wallet, settings, chains, bus, limiter } = ctx;
+  const { db, auth, wallet, settings, chains, bus, limiter, plays, seeds, double, doubleChains } = ctx;
   const router = express.Router();
   const ipOf = (req) => clientIp(req.headers, req.socket.remoteAddress);
 
@@ -253,23 +255,106 @@ module.exports = function publicRoutes(ctx) {
   });
 
   router.get('/fair', (req, res) => {
-    res.json(chains.publicInfo());
+    res.json(req.query.game === 'double' ? doubleChains.publicInfo() : chains.publicInfo());
   });
 
   router.get('/top', (req, res) => {
     const periodName = req.query.period;
     const today = startOfDay();
     const since = periodName === 'week' ? today - 6 * DAY : periodName === 'month' ? today - 29 * DAY : today;
-    const base = `SELECT b.round_id, b.amount, b.cashout, b.payout, u.username AS user
-                  FROM bets b JOIN users u ON u.id = b.user_id
-                  WHERE b.status = 'won' AND b.created_at >= ?`;
-    const wins = db.all(`${base} ORDER BY (b.payout - b.amount) DESC LIMIT 15`, since);
-    const multipliers = db.all(`${base} ORDER BY b.cashout DESC, b.payout DESC LIMIT 15`, since);
+    // Ganancias de todos los juegos. round_id = ronda (Crash y Double) o número de jugada (los demás).
+    const base = `SELECT * FROM (
+        SELECT 'crash' AS game, b.round_id, b.amount, b.cashout, b.payout, u.username AS user
+        FROM bets b JOIN users u ON u.id = b.user_id WHERE b.status = 'won' AND b.created_at >= ?
+        UNION ALL
+        SELECT p.game, p.id, p.amount, p.multiplier, p.payout, u.username
+        FROM plays p JOIN users u ON u.id = p.user_id WHERE p.status = 'won' AND p.ended_at >= ?
+        UNION ALL
+        SELECT 'double', d.round_id, d.amount, (d.payout * 100) / d.amount, d.payout, u.username
+        FROM double_bets d JOIN users u ON u.id = d.user_id WHERE d.status = 'won' AND d.created_at >= ?
+      )`;
+    const wins = db.all(`${base} ORDER BY (payout - amount) DESC LIMIT 15`, since, since, since);
+    const multipliers = db.all(`${base} ORDER BY cashout DESC, payout DESC LIMIT 15`, since, since, since);
     const rounds = db.all(
       "SELECT id, crash_point FROM rounds WHERE status = 'crashed' AND ended_at >= ? ORDER BY crash_point DESC LIMIT 15",
       since,
     );
     res.json({ wins, multipliers, rounds });
+  });
+
+  // ───────────────────────── Juegos con semillas (Minas, Penales, Plinko, Ruleta) ─────────────────────────
+
+  router.get('/plays', requireUser, (req, res) => {
+    const game = String(req.query.game || '');
+    const limit = limitOf(req);
+    if (game === 'double') return res.json({ items: double.userHistory(req.user.id, limit) });
+    if (game && !PLAY_GAMES.has(game)) throw new AppError('Juego inválido');
+    res.json({ items: plays.history(req.user.id, game || null, limit) });
+  });
+
+  router.get('/plays/:id', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const d = Number.isSafeInteger(id) && id > 0 ? plays.details(id) : null;
+    if (!d) throw new AppError('Jugada no encontrada', 404);
+    res.json(d);
+  });
+
+  router.get('/seeds', requireUser, (req, res) => {
+    res.json(seeds.publicInfo(req.user.id));
+  });
+
+  router.post('/seeds/rotate', requireUser, (req, res) => {
+    if (!limiter.hit('seed:' + req.user.id, 20, 3600_000)) throw new AppError('Cambiaste las semillas demasiadas veces, esperá un rato', 429);
+    res.json(seeds.rotate(req.user.id, (req.body || {}).clientSeed));
+  });
+
+  // ───────────────────────── 🎡 Double ─────────────────────────
+
+  router.get('/double/rounds', (req, res) => {
+    const items = db.all(
+      `SELECT id, chain_id, chain_index, hash, result, status, ended_at, total_bet, total_payout, players
+       FROM double_rounds WHERE status IN ('ended', 'cancelled') ORDER BY id DESC LIMIT ?`,
+      limitOf(req, 50, 200),
+    );
+    res.json({ items });
+  });
+
+  router.get('/double/rounds/:id', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const r = Number.isSafeInteger(id) ? db.get('SELECT * FROM double_rounds WHERE id = ?', id) : null;
+    if (!r) throw new AppError('Ronda no encontrada', 404);
+    if (r.status !== 'ended' && r.status !== 'cancelled') return res.json({ round: { id: r.id, status: r.status } });
+    const chain = db.get('SELECT id, salt, house_edge_bps, terminal_hash, length FROM chains WHERE id = ?', r.chain_id);
+    const previous = db.get(
+      "SELECT id, hash FROM double_rounds WHERE chain_id = ? AND chain_index = ? AND status IN ('ended', 'cancelled')",
+      r.chain_id,
+      r.chain_index - 1,
+    );
+    const bets = db.all(
+      `SELECT b.id, b.color, b.amount, b.payout, b.status, u.username AS user
+       FROM double_bets b JOIN users u ON u.id = b.user_id
+       WHERE b.round_id = ? AND b.status IN ('won', 'lost', 'refunded')
+       ORDER BY b.amount DESC LIMIT 300`,
+      r.id,
+    );
+    res.json({
+      round: {
+        id: r.id,
+        chain_id: r.chain_id,
+        chain_index: r.chain_index,
+        hash: r.hash,
+        result: r.result,
+        status: r.status,
+        spun_at: r.spun_at,
+        ended_at: r.ended_at,
+        total_bet: r.total_bet,
+        total_payout: r.total_payout,
+        players: r.players,
+      },
+      chain,
+      previous: previous || null,
+      bets,
+    });
   });
 
   return router;

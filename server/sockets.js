@@ -3,13 +3,19 @@ const { AppError, clientIp, RateLimiter, fmtGs, fmtMult } = require('./util');
 const { publicUser } = require('./auth');
 const stats = require('./stats');
 
+const GAME_ICONS = { crash: '🚀', mines: '💣', penalty: '⚽', double: '🎡', plinko: '🔴', roulette: '🎰' };
+const GAME_LABELS = { crash: 'el Crash', mines: 'Minas', penalty: 'los Penales', double: 'el Double', plinko: 'Plinko', roulette: 'la Ruleta' };
+const FEED_SIZE = 30; // jugadas en vivo que se guardan para quien recién entra
+const FEED_EVERY_MS = 600; // las jugadas se envían agrupadas para no saturar a los celulares
+const ACTIONS_PER_10S = 80;
+
 /**
  * Tiempo real con Socket.IO.
  *  - Namespace "/"      → jugadores y espectadores (juego, apuestas, chat).
  *  - Namespace "/admin" → solo administradores (estadísticas en vivo, avisos de depósitos/retiros, actividad).
  */
 module.exports = function setupSockets(io, ctx) {
-  const { db, auth, engine, chat, bus, settings, chains } = ctx;
+  const { db, auth, engine, chat, bus, settings, chains, plays, double } = ctx;
   const limiter = new RateLimiter();
   const online = new Map(); // userId → { id, username, sockets, since, ip, ua }
 
@@ -41,6 +47,23 @@ module.exports = function setupSockets(io, ctx) {
   }, 3000);
   onlineTimer.unref();
 
+  // Jugadas en vivo de todos los juegos (se envían en tandas)
+  const recentFeed = [];
+  let feedQueue = [];
+  bus.on('feed', (item) => {
+    feedQueue.push(item);
+    recentFeed.unshift(item);
+    if (recentFeed.length > FEED_SIZE) recentFeed.length = FEED_SIZE;
+  });
+  const feedTimer = setInterval(() => {
+    if (!feedQueue.length) return;
+    const batch = feedQueue.slice(-FEED_SIZE);
+    feedQueue = [];
+    io.emit('feed', batch);
+    io.of('/admin').emit('feed', batch);
+  }, FEED_EVERY_MS);
+  feedTimer.unref();
+
   function snapshot(user) {
     return {
       serverTime: Date.now(),
@@ -49,6 +72,10 @@ module.exports = function setupSockets(io, ctx) {
       fair: chains.summary(),
       game: engine.publicState(),
       mine: user ? engine.userBets(user.id) : [null, null],
+      double: double.publicState(),
+      myDouble: user ? double.userBets(user.id) : null,
+      plays: user ? plays.activePlays(user.id) : { mines: null, penalty: null },
+      feed: recentFeed,
       chat: chat.recent,
       online: onlinePayload(),
     };
@@ -81,7 +108,7 @@ module.exports = function setupSockets(io, ctx) {
     const handle = (name, fn) => {
       socket.on(name, (data, ack) => {
         const reply = typeof ack === 'function' ? ack : () => {};
-        if (!limiter.hit('s:' + socket.id, 40, 10_000)) {
+        if (!limiter.hit('s:' + socket.id, ACTIONS_PER_10S, 10_000)) {
           reply({ ok: false, error: 'Demasiadas acciones seguidas, esperá un momento' });
           return;
         }
@@ -120,6 +147,23 @@ module.exports = function setupSockets(io, ctx) {
       return {};
     });
 
+    // Juegos individuales: la respuesta trae la jugada y el saldo final
+    const balanceOf = (u) => ctx.wallet.balanceOf(u.id);
+    const playHandler = (name, method) =>
+      handle(name, (u, d) => {
+        const play = plays[method](u.id, d);
+        return { play, balance: balanceOf(u) };
+      });
+    playHandler('mines:start', 'minesStart');
+    playHandler('mines:reveal', 'minesReveal');
+    playHandler('mines:cashout', 'minesCashout');
+    playHandler('penalty:start', 'penaltyStart');
+    playHandler('penalty:kick', 'penaltyKick');
+    playHandler('penalty:cashout', 'penaltyCashout');
+    playHandler('plinko:drop', 'plinkoDrop');
+    playHandler('roulette:spin', 'rouletteSpin');
+    handle('double:bet', (u, d) => ({ mine: double.placeBet(u.id, d), balance: balanceOf(u) }));
+
     socket.on('disconnect', () => {
       onlineDirty = true;
       if (!uid) return;
@@ -143,9 +187,15 @@ module.exports = function setupSockets(io, ctx) {
   engine.on('betRefund', (d) => io.emit('betRefund', d));
   engine.on('paused', (d) => io.emit('paused', d));
 
+  // Double → todos
+  for (const name of ['betting', 'bet', 'spin', 'result', 'refund', 'paused']) {
+    double.on(name, (d) => io.emit('double:' + name, d));
+  }
+
   // Eventos privados de cada usuario
   bus.on('balance', (userId, balance) => io.to('u:' + userId).emit('balance', { balance }));
   bus.on('myBet', (userId, bet) => io.to('u:' + userId).emit('myBet', bet));
+  bus.on('myDouble', (userId, d) => io.to('u:' + userId).emit('myDouble', d));
   bus.on('notify', (userId, n) => io.to('u:' + userId).emit('notify', n));
   bus.on('userUpdate', (userId) => {
     const u = loadUser(userId);
@@ -165,8 +215,19 @@ module.exports = function setupSockets(io, ctx) {
 
   // Ganancias grandes → mensaje en el chat
   bus.on('bigwin', (w) => {
-    chat.system(`🔥 ${w.user} retiró a ${fmtMult(w.cashout)} y ganó ${fmtGs(w.payout)}`, 'win');
-    bus.emit('activity', { kind: 'bigwin', text: `🔥 ${w.user} ganó ${fmtGs(w.payout)} (${fmtMult(w.cashout)}) en la ronda #${w.roundId}`, userId: w.userId });
+    const game = GAME_ICONS[w.game] ? w.game : 'crash';
+    if (game === 'crash') {
+      chat.system(`🔥 ${w.user} retiró a ${fmtMult(w.cashout)} y ganó ${fmtGs(w.payout)}`, 'win');
+      bus.emit('activity', { kind: 'bigwin', text: `🔥 ${w.user} ganó ${fmtGs(w.payout)} (${fmtMult(w.cashout)}) en la ronda #${w.roundId}`, userId: w.userId });
+      return;
+    }
+    const icon = GAME_ICONS[game];
+    chat.system(`${icon} ${w.user} ganó ${fmtGs(w.payout)} (${fmtMult(w.cashout)}) en ${GAME_LABELS[game]}`, 'win');
+    bus.emit('activity', {
+      kind: 'bigwin',
+      text: `${icon} ${w.user} ganó ${fmtGs(w.payout)} (${fmtMult(w.cashout)}) en ${GAME_LABELS[game]} #${w.roundId}`,
+      userId: w.userId,
+    });
   });
 
   // ───────────────────────── Administradores ─────────────────────────
@@ -193,6 +254,10 @@ module.exports = function setupSockets(io, ctx) {
       if (b.status === 'cancelled' || b.status === 'refunded') continue;
       inRound.set(b.userId, (inRound.get(b.userId) || 0) + b.amount);
     }
+    for (const b of double.bets.values()) {
+      if (b.status === 'refunded') continue;
+      inRound.set(b.userId, (inRound.get(b.userId) || 0) + b.amount);
+    }
     return list
       .map(({ ua, ...o }) => ({
         ...o,
@@ -210,6 +275,7 @@ module.exports = function setupSockets(io, ctx) {
       connections: io.of('/').sockets.size,
       onlineUsers: onlineUsers(),
       game: engine.adminState(),
+      double: double.adminState(),
       pending: stats.pending(db),
     };
   }
@@ -235,6 +301,7 @@ module.exports = function setupSockets(io, ctx) {
   }
   bus.on('activity', (a) => adminNs.emit('activity', { ...a, ts: Date.now() }));
   engine.on('crash', (d) => adminNs.emit('roundEnd', d));
+  double.on('result', (d) => adminNs.emit('doubleEnd', d));
 
   return { snapshot };
 };

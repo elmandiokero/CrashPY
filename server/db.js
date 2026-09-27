@@ -185,7 +185,82 @@ CREATE TABLE IF NOT EXISTS audit (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit(created_at);
+
+-- Semillas provably fair de cada jugador (Minas, Penales, Plinko, Ruleta)
+CREATE TABLE IF NOT EXISTS seeds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  server_seed TEXT NOT NULL,
+  server_hash TEXT NOT NULL,
+  client_seed TEXT NOT NULL,
+  nonce INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  revealed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_seeds_user ON seeds(user_id, active);
+
+-- Jugadas individuales (Minas, Penales, Plinko, Ruleta)
+CREATE TABLE IF NOT EXISTS plays (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  game TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  params TEXT,
+  state TEXT,
+  result TEXT,
+  multiplier INTEGER NOT NULL DEFAULT 0,
+  payout INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL,
+  seed_id INTEGER NOT NULL REFERENCES seeds(id),
+  nonce INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  ended_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_plays_user ON plays(user_id, id);
+CREATE INDEX IF NOT EXISTS idx_plays_game ON plays(game, ended_at);
+CREATE INDEX IF NOT EXISTS idx_plays_active ON plays(user_id, game, status);
+
+-- Double (ruleta de colores multijugador)
+CREATE TABLE IF NOT EXISTS double_rounds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chain_id INTEGER NOT NULL REFERENCES chains(id),
+  chain_index INTEGER NOT NULL,
+  hash TEXT NOT NULL,
+  result INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  spun_at INTEGER,
+  ended_at INTEGER,
+  total_bet INTEGER NOT NULL DEFAULT 0,
+  total_payout INTEGER NOT NULL DEFAULT 0,
+  total_refund INTEGER NOT NULL DEFAULT 0,
+  players INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (chain_id, chain_index)
+);
+CREATE INDEX IF NOT EXISTS idx_double_rounds_status ON double_rounds(status);
+CREATE INDEX IF NOT EXISTS idx_double_rounds_ended ON double_rounds(ended_at);
+
+CREATE TABLE IF NOT EXISTS double_bets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  round_id INTEGER NOT NULL REFERENCES double_rounds(id),
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  color TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  payout INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_double_bets_round ON double_bets(round_id);
+CREATE INDEX IF NOT EXISTS idx_double_bets_user ON double_bets(user_id, id);
 `;
+
+/** Cambios de estructura para bases creadas con versiones anteriores. */
+function migrate(raw) {
+  const cols = raw.prepare('PRAGMA table_info(chains)').all().map((c) => c.name);
+  if (!cols.includes('game')) raw.exec("ALTER TABLE chains ADD COLUMN game TEXT NOT NULL DEFAULT 'crash'");
+  raw.exec('CREATE INDEX IF NOT EXISTS idx_chains_game ON chains(game, active)');
+}
 
 /**
  * Envoltorio mínimo sobre node:sqlite (sin dependencias nativas que compilar).
@@ -202,6 +277,7 @@ class Database {
     this.raw.exec('PRAGMA foreign_keys = ON');
     this.raw.exec('PRAGMA busy_timeout = 5000');
     this.raw.exec(SCHEMA);
+    migrate(this.raw);
     this.statements = new Map();
     this.depth = 0;
     this.commitCallbacks = [];
