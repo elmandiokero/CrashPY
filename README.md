@@ -25,6 +25,16 @@ Todos los resultados son **comprobables (provably fair)**, con **chat**, **depó
 Cada juego tiene su dirección propia y se cambia de juego desde el menú de arriba sin perder el saldo, el chat ni la conexión.
 Las partidas de Minas y Penales quedan guardadas: si se cierra la página, al volver se sigue donde estaba.
 
+<p align="center">
+  <img src="docs/minas.jpg" alt="Minas" width="150">
+  <img src="docs/penales.jpg" alt="Penales de la Albirroja" width="150">
+  <img src="docs/double.jpg" alt="Double en vivo" width="150">
+  <img src="docs/plinko.jpg" alt="Plinko" width="150">
+  <img src="docs/ruleta.jpg" alt="Ruleta en vivo" width="150">
+</p>
+
+![Ruleta en vivo en la PC: fichas confirmadas, mesa y apuestas de la ronda](docs/ruleta-pc.jpg)
+
 ## ✨ Qué trae
 
 **Para los jugadores**
@@ -49,6 +59,8 @@ Las partidas de Minas y Penales quedan guardadas: si se cierra la página, al vo
 - **🤖 Bots** (opcional): jugadores de la sala que animan el casino — apuestan en todos los juegos y comentan en el chat. Ver abajo.
 - **Auditoría**: todo lo que hace cada admin queda registrado. **Libro contable**: cada guaraní que entra o sale queda anotado.
 - **Respaldos** automáticos de la base de datos cada 6 horas y descarga manual.
+
+![Admin → Juegos: cada juego con su ganancia, el Double y la Ruleta en vivo](docs/admin-juegos.jpg)
 
 ---
 
