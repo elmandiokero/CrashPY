@@ -1,0 +1,945 @@
+/* ═══════════════ CrashPY · piezas compartidas de todos los juegos ═══════════════ */
+
+/* ───────── Menú de juegos ───────── */
+.game-nav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 12px 0;
+  max-width: 1640px;
+  margin: 0 auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding: 12px;
+}
+
+.game-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.gn-item {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px 8px 11px;
+  border-radius: 999px;
+  background: rgba(16, 22, 47, 0.85);
+  border: 1px solid var(--line-2);
+  color: #b7bee3;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gn-item:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.gn-item:active {
+  transform: scale(0.96);
+}
+
+.gn-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.gn-item.active {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #d52b1e 0%, #7b2a8c 55%, #0038a8 100%);
+  box-shadow: 0 6px 20px rgba(0, 56, 168, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.gn-item.off {
+  opacity: 0.55;
+}
+
+.gn-item.off .gn-name::after {
+  content: ' ⏸';
+  font-size: 0.75em;
+}
+
+.gn-item.busy::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 8px var(--green);
+  animation: gnPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes gnPulse {
+  50% {
+    transform: scale(0.7);
+    opacity: 0.6;
+  }
+}
+
+/* ───────── Vista de cada juego ───────── */
+.game-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  container: gameview / inline-size;
+}
+
+.game-view[hidden] {
+  display: none;
+}
+
+/* Juegos nuevos: escenario + panel. Si hay lugar, el panel va a la izquierda. */
+.gv {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'stage' 'panel';
+}
+
+.gv-stage {
+  grid-area: stage;
+  position: relative;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(61, 123, 255, 0.12), transparent 60%),
+    linear-gradient(180deg, #0a0f24, #070a1a);
+  /* El fondo llega hasta el borde: así un degradé claro no asoma como una línea en el borde de 1px */
+  background-origin: border-box;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55), 0 16px 40px rgba(0, 0, 0, 0.35);
+  isolation: isolate;
+  min-width: 0;
+}
+
+.gv-panel {
+  grid-area: panel;
+  border-radius: 20px;
+  padding: 12px;
+  background: linear-gradient(180deg, rgba(30, 39, 80, 0.85), rgba(16, 22, 47, 0.95));
+  border: 1px solid var(--line-2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+@container gameview (min-width: 620px) {
+  .gv {
+    grid-template-columns: 272px minmax(0, 1fr);
+    grid-template-areas: 'panel stage';
+    align-items: start;
+  }
+
+  .gv-panel {
+    position: sticky;
+    top: 74px;
+  }
+}
+
+/* En el celular el botón principal va justo debajo del tablero */
+@container gameview (max-width: 619px) {
+  .gv-panel > .bp-action {
+    order: -2;
+  }
+
+  .gv-panel > .gv-head {
+    order: 10;
+  }
+
+  .gv-panel > .gv-head .gv-title {
+    display: none;
+  }
+
+  .gv-panel > .gv-head .gv-tools {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.gv-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 8px;
+}
+
+.gv-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 900;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.gv-title .gv-icon {
+  font-size: 1.35rem;
+}
+
+.gv-tools {
+  display: flex;
+  gap: 6px;
+}
+
+.gv-tool {
+  border: 1px solid var(--line-2);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 5px 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #cfd5f5;
+  white-space: nowrap;
+}
+
+.gv-tool:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.gv-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 5px;
+}
+
+.gv-label b {
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.82rem;
+}
+
+.gv-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+  min-height: 1.1em;
+}
+
+.gv-note.good {
+  color: #7ff0ae;
+}
+
+.gv-note.bad {
+  color: #ff8f9b;
+}
+
+.gv-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.gv-stat {
+  background: rgba(6, 9, 19, 0.55);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 7px 9px;
+  min-width: 0;
+}
+
+.gv-stat small {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.gv-stat b {
+  display: block;
+  font-size: 0.98rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Monto de la apuesta (versión de los juegos nuevos) */
+.amount-ctl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.amount-ctl .amount-row {
+  padding: 4px;
+}
+
+.amt-mini {
+  flex-shrink: 0;
+  height: 34px;
+  min-width: 34px;
+  padding: 0 7px;
+  border-radius: 10px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #cfd5f5;
+}
+
+.amt-mini:active {
+  transform: scale(0.94);
+}
+
+.amount-ctl.locked,
+.segmented.locked {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* Selector de opciones */
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 13px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+}
+
+.segmented button {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 0;
+  border-radius: 9px;
+  padding: 7px 4px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.84rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.segmented button.active {
+  background: var(--panel-3);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.gv-panel .bp-action {
+  min-height: 64px;
+}
+
+/* Aviso de juego pausado */
+.game-paused {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  padding: 20px;
+  background: rgba(6, 9, 19, 0.82);
+  backdrop-filter: blur(4px);
+}
+
+.game-paused[hidden] {
+  display: none;
+}
+
+.game-paused b {
+  font-size: 1.3rem;
+}
+
+.game-paused span {
+  color: var(--muted);
+  max-width: 280px;
+}
+
+/* Cartel grande de resultado en el escenario */
+.gv-result {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 12;
+  transform: translate(-50%, -50%) scale(0.6);
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+  padding: 14px 24px;
+  border-radius: 20px;
+  background: rgba(6, 9, 19, 0.88);
+  border: 2px solid rgba(43, 217, 107, 0.7);
+  box-shadow: 0 0 40px rgba(43, 217, 107, 0.35), 0 18px 40px rgba(0, 0, 0, 0.5);
+  transition: transform 0.35s cubic-bezier(0.2, 1.4, 0.4, 1), opacity 0.25s;
+  min-width: 170px;
+}
+
+.gv-result.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.gv-result .r-mult {
+  display: block;
+  font-size: clamp(2rem, 9cqw, 3rem);
+  font-weight: 900;
+  color: #5ff29a;
+  text-shadow: 0 0 22px rgba(43, 217, 107, 0.7);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+.gv-result .r-amount {
+  display: block;
+  margin-top: 4px;
+  font-weight: 800;
+  color: #d8ffe6;
+  white-space: nowrap;
+}
+
+.gv-result.lose {
+  border-color: rgba(255, 59, 78, 0.7);
+  box-shadow: 0 0 40px rgba(255, 59, 78, 0.35), 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.gv-result.lose .r-mult {
+  color: #ff6b79;
+  text-shadow: 0 0 22px rgba(255, 59, 78, 0.6);
+}
+
+.gv-result.lose .r-amount {
+  color: #ffd3d8;
+}
+
+.gv-result.big {
+  border-color: rgba(255, 197, 61, 0.85);
+  box-shadow: 0 0 50px rgba(255, 197, 61, 0.45), 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.gv-result.big .r-mult {
+  color: var(--gold);
+  text-shadow: 0 0 26px rgba(255, 197, 61, 0.8);
+}
+
+/* Papelitos */
+.confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 15;
+}
+
+.confetti i {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 13px;
+  border-radius: 2px;
+  opacity: 0;
+  animation-name: confettiFall;
+  animation-timing-function: cubic-bezier(0.25, 0.6, 0.45, 1);
+  animation-fill-mode: forwards;
+}
+
+@keyframes confettiFall {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), 110cqh) rotate(var(--rot));
+  }
+}
+
+/* ───────── Jugadas en vivo (todo el casino) ───────── */
+.live-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.live-pane[hidden] {
+  display: none;
+}
+
+.feed-game {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.9rem;
+}
+
+.feed-row.fresh {
+  animation: feedIn 0.45s ease-out;
+}
+
+.feed-row.here .feed-game {
+  background: rgba(61, 123, 255, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(61, 123, 255, 0.5);
+}
+
+@keyframes feedIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+    background: rgba(255, 197, 61, 0.14);
+  }
+}
+
+/* ───────── Mis apuestas / detalle de jugadas ───────── */
+.mine-fair {
+  margin-bottom: 8px;
+}
+
+.mini-mines {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  max-width: 260px;
+  margin: 4px auto 14px;
+}
+
+.mini-mines .mm {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--panel-3);
+  font-size: 1.05rem;
+}
+
+.mini-mines .mm.gem {
+  background: rgba(43, 217, 107, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(43, 217, 107, 0.5);
+}
+
+.mini-mines .mm.mine {
+  background: rgba(255, 59, 78, 0.12);
+  opacity: 0.75;
+}
+
+.mini-mines .mm.hit {
+  background: rgba(255, 59, 78, 0.45);
+  box-shadow: inset 0 0 0 2px var(--red);
+}
+
+.mini-kicks {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 4px 0 14px;
+}
+
+.mini-kicks .mk {
+  border-radius: 10px;
+  padding: 7px 5px;
+  text-align: center;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.mini-kicks .mk b {
+  display: block;
+  font-size: 0.82rem;
+}
+
+.mini-kicks .mk small {
+  display: block;
+  font-size: 0.66rem;
+  color: var(--muted);
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.mini-kicks .mk.goal {
+  background: rgba(43, 217, 107, 0.14);
+  border-color: rgba(43, 217, 107, 0.45);
+}
+
+.mini-kicks .mk.saved {
+  background: rgba(255, 59, 78, 0.14);
+  border-color: rgba(255, 59, 78, 0.45);
+}
+
+.mini-plinko {
+  margin: 4px 0 14px;
+}
+
+.mp-path {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.mp-buckets {
+  display: flex;
+  gap: 3px;
+}
+
+.mp-buckets span {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 0;
+  border-radius: 6px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-align: center;
+  color: #1a0d00;
+  opacity: 0.55;
+}
+
+.mp-buckets span.on {
+  opacity: 1;
+  outline: 2px solid #fff;
+  transform: translateY(-2px);
+}
+
+.mini-plinko .mp-buckets {
+  gap: 2px;
+}
+
+.mini-plinko .mp-buckets span {
+  font-size: clamp(0.45rem, 2.1vw, 0.62rem);
+  letter-spacing: -0.03em;
+  overflow: hidden;
+}
+
+.mp-buckets .hot {
+  background: #ff3b4e;
+  color: #fff;
+}
+
+.mp-buckets .warm {
+  background: #ff8a3d;
+}
+
+.mp-buckets .mid {
+  background: #ffc53d;
+}
+
+.mp-buckets .cold {
+  background: #ffe08a;
+}
+
+.mini-roulette .mr-number {
+  color: #fff;
+  width: 64px;
+  height: 64px;
+  margin: 4px auto 12px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.6rem;
+  font-weight: 900;
+  border: 3px solid rgba(255, 255, 255, 0.8);
+}
+
+.mr-number.red {
+  background: #d8263a;
+}
+
+.mr-number.black {
+  background: #151827;
+}
+
+.mr-number.green {
+  background: #0f9d58;
+}
+
+/* Ruleta en vivo: bolita con el número (listas y detalle de ronda). Prefijo rn- para no chocar con la pantalla de la Ruleta (rl-) */
+.rn-ball {
+  --rn-ball: #151827;
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.28), transparent 55%), var(--rn-ball);
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  color: #fff;
+  font-weight: 900;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.rn-ball.red {
+  --rn-ball: #d8263a;
+}
+
+.rn-ball.black {
+  --rn-ball: #151827;
+}
+
+.rn-ball.green {
+  --rn-ball: #0f9d58;
+}
+
+.rn-ball.big {
+  display: grid;
+  width: 68px;
+  min-width: 68px;
+  height: 68px;
+  font-size: 1.7rem;
+  border-width: 3px;
+  margin: 2px auto 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.rn-hero-name {
+  margin-top: 4px;
+  font-weight: 800;
+}
+
+.rn-bets-cell {
+  max-width: 220px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.mr-badge.rn-badge {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.mr-badge.rn-badge.red {
+  background: #d8263a;
+}
+
+.mr-badge.rn-badge.black {
+  background: #151827;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.mr-badge.rn-badge.green {
+  background: #0f9d58;
+}
+
+.mr-badge.rn-badge.off {
+  opacity: 0.55;
+}
+
+/* Semillas */
+.seed-current {
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.seed-hash {
+  font-size: 0.78rem;
+  word-break: break-all;
+  background: var(--bg-2);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.seed-input {
+  display: flex;
+  gap: 6px;
+}
+
+.seed-input .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.seed-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.seed-card.fresh {
+  border-color: rgba(43, 217, 107, 0.6);
+  box-shadow: 0 0 0 3px rgba(43, 217, 107, 0.12);
+}
+
+.seed-card .kv {
+  margin: 0 0 6px;
+}
+
+.seed-verify {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Double: bolitas de color (se usan también en listas y modales) */
+.dbl-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  vertical-align: -1px;
+}
+
+.dbl-dot.red {
+  background: #f12c4c;
+}
+
+.dbl-dot.black {
+  background: #262a3d;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.dbl-dot.white {
+  background: #fff;
+}
+
+.dbl-result-tile {
+  color: #fff;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 8px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  font-size: 1.7rem;
+  font-weight: 900;
+}
+
+.dbl-result-tile.red {
+  background: linear-gradient(180deg, #ff4d69, #d41f3d);
+}
+
+.dbl-result-tile.black {
+  background: linear-gradient(180deg, #353a52, #1b1e2e);
+}
+
+.dbl-result-tile.white {
+  background: linear-gradient(180deg, #ffffff, #dfe4f5);
+  color: #d41f3d;
+}
+
+/* ───────── Menú lateral: juegos ───────── */
+.drawer-label {
+  padding: 4px 16px 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.drawer-games {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 12px 6px;
+}
+
+.drawer-game {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 4px;
+  border-radius: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.drawer-game span {
+  font-size: 1.3rem;
+}
+
+.drawer-game.active {
+  border-color: rgba(61, 123, 255, 0.7);
+  background: rgba(61, 123, 255, 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-item.busy::after,
+  .feed-row.fresh {
+    animation: none;
+  }
+}
+
+/* ───────── 🤖 Bots de la sala (siempre marcados) ───────── */
+.bot-avatar {
+  background: linear-gradient(135deg, #3a3f6e, #22284d) !important;
+  font-size: 0.82rem;
+}
+
+.bot-badge {
+  display: inline-block;
+  flex-shrink: 0;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  color: #d9d1ff;
+  background: rgba(155, 123, 255, 0.18);
+  border: 1px solid rgba(155, 123, 255, 0.45);
+  vertical-align: 1px;
+}
+
+.bet-row.bot {
+  opacity: 0.8;
+}
+
+.bet-row.bot .bet-user > span:nth-child(2) {
+  color: var(--muted);
+}
+
+.msg.bot .msg-body {
+  background: rgba(155, 123, 255, 0.07);
+  border: 1px dashed rgba(155, 123, 255, 0.28);
+}
+
+.bet-row.bot .bet-user > span:nth-child(2) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bet-row.bot .bet-user {
+  padding-right: 6px;
+}
+
+.feed-row.partial .bet-win {
+  color: #ffd58a;
+}

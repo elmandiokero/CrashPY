@@ -92,6 +92,7 @@ function applyState(g, fromAdmin) {
   if (Array.isArray(g.bets)) {
     const next = new Map();
     for (const b of g.bets) {
+      if (b.bot) continue; // los bots juegan con plata ficticia: no cuentan en la ronda real
       // El estado público incluye las apuestas devueltas; las guardamos aparte como hace el servidor.
       if (b.status === 'refunded') game.refunded.set(b.id, { ...game.bets.get(b.id), ...b });
       else next.set(b.id, fromAdmin ? b : { ...game.bets.get(b.id), ...b });
@@ -143,10 +144,12 @@ export function initGame(sock) {
     emitBets();
   });
   sock.on('bet', (b) => {
+    if (b.bot) return;
     game.bets.set(b.id, { ...game.bets.get(b.id), ...b });
     emitBets();
   });
   sock.on('cashout', (c) => {
+    if (c.bot) return;
     const b = game.bets.get(c.id);
     if (b) Object.assign(b, { status: 'won', cashout: c.cashout, payout: c.payout });
     else game.bets.set(c.id, { id: c.id, uid: c.uid, user: c.user, slot: c.slot, amount: c.amount, status: 'won', cashout: c.cashout, payout: c.payout });
@@ -157,6 +160,7 @@ export function initGame(sock) {
     emitBets();
   });
   sock.on('betRefund', (c) => {
+    if (typeof c.id === 'string') return; // bots
     const b = game.bets.get(c.id);
     if (b) {
       b.status = 'refunded';

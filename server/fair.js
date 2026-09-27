@@ -41,8 +41,10 @@ function msForMultiplier(m100, growth) {
 }
 
 class ChainManager {
-  constructor(db, { length, defaultEdgeBps, log = console.log }) {
+  constructor(db, { game = 'crash', length, defaultEdgeBps, log = console.log }) {
     this.db = db;
+    this.game = game;
+    this.label = game === 'crash' ? '' : ` (${game})`;
     this.length = length;
     this.defaultEdgeBps = defaultEdgeBps;
     this.log = log;
@@ -52,7 +54,7 @@ class ChainManager {
   }
 
   init() {
-    const row = this.db.get('SELECT * FROM chains WHERE active = 1 ORDER BY id DESC LIMIT 1');
+    const row = this.db.get('SELECT * FROM chains WHERE active = 1 AND game = ? ORDER BY id DESC LIMIT 1', this.game);
     if (row) this._load(row);
     else this._create(this.defaultEdgeBps);
   }
@@ -75,7 +77,7 @@ class ChainManager {
     }
     this.active = row;
     this.checkpoints = checkpoints;
-    this.log(`🔐 Cadena provably fair #${row.id} lista (${row.used.toLocaleString('es-PY')} de ${row.length.toLocaleString('es-PY')} rondas usadas, ${Date.now() - t0} ms)`);
+    this.log(`🔐 Cadena provably fair${this.label} #${row.id} lista (${row.used.toLocaleString('es-PY')} de ${row.length.toLocaleString('es-PY')} rondas usadas, ${Date.now() - t0} ms)`);
   }
 
   _create(edgeBps) {
@@ -85,9 +87,10 @@ class ChainManager {
     const { checkpoints, terminal } = this._build(seed, this.length);
     const now = Date.now();
     this.db.tx(() => {
-      this.db.run('UPDATE chains SET active = 0, ended_at = ? WHERE active = 1', now);
+      this.db.run('UPDATE chains SET active = 0, ended_at = ? WHERE active = 1 AND game = ?', now, this.game);
       const res = this.db.run(
-        'INSERT INTO chains (seed, terminal_hash, salt, house_edge_bps, length, used, active, created_at) VALUES (?, ?, ?, ?, ?, 0, 1, ?)',
+        'INSERT INTO chains (game, seed, terminal_hash, salt, house_edge_bps, length, used, active, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?)',
+        this.game,
         seed,
         terminal,
         salt,
@@ -98,7 +101,7 @@ class ChainManager {
       this.active = this.db.get('SELECT * FROM chains WHERE id = ?', Number(res.lastInsertRowid));
     });
     this.checkpoints = checkpoints;
-    this.log(`🔐 Nueva cadena provably fair #${this.active.id} generada (${this.length.toLocaleString('es-PY')} rondas, ventaja ${(edgeBps / 100).toFixed(2)}%, ${Date.now() - t0} ms)`);
+    this.log(`🔐 Nueva cadena provably fair${this.label} #${this.active.id} generada (${this.length.toLocaleString('es-PY')} rondas, ventaja ${(edgeBps / 100).toFixed(2)}%, ${Date.now() - t0} ms)`);
     this.log(`   Hash terminal publicado: ${terminal}`);
   }
 
@@ -157,7 +160,8 @@ class ChainManager {
   publicInfo() {
     const previous = this.db.all(
       `SELECT id, seed, terminal_hash, salt, house_edge_bps, length, used, created_at, ended_at
-       FROM chains WHERE active = 0 ORDER BY id DESC LIMIT 20`,
+       FROM chains WHERE active = 0 AND game = ? ORDER BY id DESC LIMIT 20`,
+      this.game,
     );
     return { current: this.summary(), previous };
   }

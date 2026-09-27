@@ -63,8 +63,20 @@ export const state = {
   connections: 0,
   pending: { deposits: { n: 0, total: 0 }, withdrawals: { n: 0, total: 0 } },
   activity: [],
+  feed: [],
   conn: 'connecting',
 };
+
+/** Los juegos del casino (mismo orden que el menú del jugador). */
+export const GAME_META = {
+  crash: { icon: '🚀', name: 'Crash' },
+  mines: { icon: '💣', name: 'Minas' },
+  penalty: { icon: '⚽', name: 'Penales' },
+  double: { icon: '🎡', name: 'Double' },
+  plinko: { icon: '🔴', name: 'Plinko' },
+  roulette: { icon: '🎰', name: 'Ruleta' },
+};
+export const GAME_ORDER = ['crash', 'mines', 'penalty', 'double', 'plinko', 'roulette'];
 
 /** Llama a la API. Si la sesión venció avisa al resto de la app (muestra el login). */
 export async function call(path, opts) {
@@ -95,6 +107,7 @@ const ICONS = {
   clipboard: ['r 8 2 8 4 1', 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2', 'M12 11h4', 'M12 16h4', 'M8 11h.01', 'M8 16h.01'],
   menu: ['M4 6h16', 'M4 12h16', 'M4 18h16'],
   gamepad: ['r 2 6 20 12 4', 'M6 12h4', 'M8 10v4', 'M15 13h.01', 'M18 11h.01'],
+  bot: ['r 4 8 16 12 3', 'M12 8V4', 'c 12 3 1', 'M9 13h.01', 'M15 13h.01', 'M9.5 17h5', 'M2 13v3', 'M22 13v3'],
   key: ['c 7.5 15.5 5.5', 'm21 2-9.6 9.6', 'm15.5 7.5 3 3L22 7l-3-3'],
   logout: ['M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4', 'm16 17 5-5-5-5', 'M21 12H9'],
   bell: ['M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9', 'M10.3 21a1.94 1.94 0 0 0 3.4 0'],

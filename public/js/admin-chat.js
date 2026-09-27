@@ -47,14 +47,22 @@ function msgEl(m) {
             icon('mute', 15),
           )
         : null;
+    const isBot = m.role === 'bot';
     el = h(
       'div',
-      { class: `cmsg cmsg-user${isAdmin ? ' is-admin' : ''}` },
-      avatar(m.user),
+      { class: `cmsg cmsg-user${isAdmin ? ' is-admin' : ''}${isBot ? ' is-bot' : ''}` },
+      isBot ? h('span', { class: 'avatar', title: 'Bot de la sala' }, '🤖') : avatar(m.user),
       h(
         'div',
         { class: 'cmsg-body' },
-        h('div', { class: 'cmsg-meta' }, userLink(m.uid, m.user, { withAvatar: false }), isAdmin ? h('span', { class: 'chip chip-gold' }, 'ADMIN') : null, time),
+        h(
+          'div',
+          { class: 'cmsg-meta' },
+          isBot ? h('b', null, m.user) : userLink(m.uid, m.user, { withAvatar: false }),
+          isAdmin ? h('span', { class: 'chip chip-gold' }, 'ADMIN') : null,
+          isBot ? h('span', { class: 'chip chip-purple' }, 'BOT') : null,
+          time,
+        ),
         h('div', { class: 'cmsg-text' }, m.text),
       ),
       h('div', { class: 'cmsg-actions' }, mute, del),

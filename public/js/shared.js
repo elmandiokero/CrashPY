@@ -322,6 +322,9 @@ export const sha256Hex = (text) => toHex(sha256Bytes(encoder.encode(String(text)
 /** HMAC-SHA256(clave, mensaje) en hexadecimal. */
 export const hmacSha256Hex = (key, message) => toHex(hmacBytes(encoder.encode(String(key)), encoder.encode(String(message))));
 
+/** HMAC-SHA256(clave, mensaje) como bytes: es lo que usan los juegos con semillas (ver games-core.js). */
+export const hmacSha256Bytes = (key, message) => hmacBytes(encoder.encode(String(key)), encoder.encode(String(message)));
+
 /** Punto de explosión (centésimas) a partir del hash de la ronda — misma fórmula que el servidor. */
 export function crashFromHash(gameHash, salt, houseEdgeBps) {
   const hmac = hmacSha256Hex(salt, gameHash);

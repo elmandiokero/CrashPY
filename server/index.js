@@ -22,6 +22,11 @@ const { ChainManager } = require('./fair');
 const { Wallet } = require('./wallet');
 const { Chat } = require('./chat');
 const { GameEngine } = require('./game');
+const { Seeds } = require('./games/seeds');
+const { PlayEngine } = require('./games/plays');
+const { DoubleEngine } = require('./games/double');
+const { RouletteEngine } = require('./games/roulette');
+const { BotManager } = require('./bots');
 const { Backups } = require('./backup');
 const { AppError, RateLimiter, randomPassword } = require('./util');
 const publicRoutes = require('./routes/public');
@@ -42,8 +47,42 @@ const chat = new Chat({ db, bus, settings });
 const engine = new GameEngine({ db, chains, settings, wallet, bus });
 const backups = new Backups(db, config.DATA_DIR);
 engine.on('betting', () => setImmediate(() => backups.maybeAuto()));
+// Minas, Penales y Plinko: cada jugada sale de las semillas del jugador
+const seeds = new Seeds(db);
+const plays = new PlayEngine({ db, wallet, settings, bus, seeds });
+// Double y Ruleta: en vivo, cada uno con su propia cadena de hashes.
+// Ventaja del Double: 3,23% (31 casillas; rojo y negro pagan 2x, blanco 30x). Se guarda solo como dato.
+const doubleChains = new ChainManager(db, { game: 'double', length: config.CHAIN_LENGTH, defaultEdgeBps: 323 });
+doubleChains.init();
+const double = new DoubleEngine({ db, chains: doubleChains, settings, wallet, bus });
+// Ventaja de la Ruleta europea: 2,70% (un solo cero). También se guarda solo como dato.
+const rouletteChains = new ChainManager(db, { game: 'roulette', length: config.CHAIN_LENGTH, defaultEdgeBps: 270 });
+rouletteChains.init();
+const roulette = new RouletteEngine({ db, chains: rouletteChains, settings, wallet, bus });
+// Bots marcados con 🤖 que animan la sala con plata ficticia (no tocan nada real)
+const bots = new BotManager({ db, engine, double, roulette, chat, settings, bus });
 const limiter = new RateLimiter();
-const ctx = { db, bus, settings, chains, wallet, auth, chat, engine, backups, limiter, config, presence: null };
+const ctx = {
+  db,
+  bus,
+  settings,
+  chains,
+  wallet,
+  auth,
+  chat,
+  engine,
+  seeds,
+  plays,
+  double,
+  doubleChains,
+  roulette,
+  rouletteChains,
+  bots,
+  backups,
+  limiter,
+  config,
+  presence: null,
+};
 
 async function ensureAdmin() {
   const count = db.get("SELECT COUNT(*) AS c FROM users WHERE role = 'admin'").c;
@@ -107,6 +146,13 @@ app.use('/api/admin', adminRoutes(ctx));
 app.use('/api', publicRoutes(ctx));
 app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 
+// Cada juego tiene su propia dirección (/minas, /double, ...), pero todos usan la misma página
+const GAME_PAGES = ['/crash', '/minas', '/penales', '/double', '/plinko', '/ruleta'];
+app.get(GAME_PAGES, (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(config.ROOT, 'public', 'index.html'));
+});
+
 app.use(
   express.static(path.join(config.ROOT, 'public'), {
     extensions: ['html'],
@@ -148,6 +194,9 @@ function lanAddresses() {
 async function main() {
   await ensureAdmin();
   engine.start();
+  double.start();
+  roulette.start();
+  bots.start();
   server.listen(config.PORT, config.HOST, () => {
     console.log(`\n🚀 CrashPY está en línea`);
     console.log(`   En esta PC:       http://localhost:${config.PORT}`);
@@ -178,6 +227,9 @@ function shutdown(signal) {
   closing = true;
   console.log(`\n⏹️  Apagando (${signal})... las apuestas de la ronda en curso se devuelven.`);
   engine.shutdown();
+  double.shutdown();
+  roulette.shutdown();
+  bots.shutdown();
   io.close();
   server.close();
   setTimeout(() => {

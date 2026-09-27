@@ -2,6 +2,7 @@
 // Si se corta la luz o se cierra el servidor en medio de una ronda, nadie pierde su apuesta.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const core = require('../public/js/games-core.js');
 const { startServer, Client, connectSocket, openDb } = require('./helpers');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -75,4 +76,154 @@ test('corte abrupto (se cae la PC) y apagado normal: la ronda se anula y se devu
   const active = db.prepare("SELECT COUNT(*) AS c FROM bets WHERE status = 'active'").get().c;
   assert.equal(active, 0);
   db.close();
+});
+
+test('🎡 Double: si se corta apostando se devuelve la apuesta; si se corta girando, se paga', async () => {
+  let srv = await startServer();
+  const dataDir = srv.dataDir;
+  const sockets = [];
+  try {
+    const admin = new Client(srv.url);
+    assert.equal((await admin.post('/api/auth/login', { username: 'admin', password: 'admin123' })).status, 200);
+    await admin.post('/api/admin/settings', { double_betting_seconds: 5, game_double: false });
+    await admin.post('/api/admin/settings', { game_double: true });
+    const reg = await new Client(srv.url).post('/api/auth/register', { username: 'giro', password: 'secret1', adult: true });
+    const userId = reg.data.user.id;
+    await admin.post(`/api/admin/users/${userId}/balance`, { op: 'add', amount: 100_000 });
+
+    const connect = async () => {
+      const c = new Client(srv.url);
+      assert.equal((await c.post('/api/auth/login', { username: 'giro', password: 'secret1' })).status, 200);
+      const s = connectSocket(srv.url, c.cookie);
+      sockets.push(s);
+      const init = await s.ready;
+      return { s, init };
+    };
+    const balance = (db) => db.prepare('SELECT balance FROM users WHERE id = ?').get(userId).balance;
+
+    // 1) Corte abrupto mientras se apuesta: la apuesta vuelve y la ronda queda para reutilizarse
+    let { s } = await connect();
+    const first = await s.waitFor('double:betting', () => true, 30000);
+    assert.ok((await s.emit('double:bet', { color: 'red', amount: 10_000 })).ok);
+    await srv.stop('SIGKILL');
+    s.close();
+    srv = await startServer({ dataDir });
+    let db = openDb(dataDir);
+    assert.equal(balance(db), 100_000);
+    assert.equal(db.prepare('SELECT status FROM double_bets WHERE round_id = ?').get(first.roundId).status, 'refunded');
+    db.close();
+
+    // 2) Corte abrupto en pleno giro: el resultado ya se vio, así que la ronda se paga al volver
+    let init;
+    ({ s, init } = await connect());
+    assert.equal(init.double.roundId, first.roundId, 'se reutiliza la ronda cuyo resultado nunca se mostró');
+    assert.equal(init.double.phase, 'BETTING');
+    assert.ok((await s.emit('double:bet', { color: 'red', amount: 10_000 })).ok);
+    assert.ok((await s.emit('double:bet', { color: 'black', amount: 10_000 })).ok);
+    const spin = await s.waitFor('double:spin', (x) => x.roundId === first.roundId, 30000);
+    await srv.stop('SIGKILL');
+    s.close();
+    db = openDb(dataDir);
+    assert.equal(db.prepare('SELECT status FROM double_rounds WHERE id = ?').get(first.roundId).status, 'spinning');
+    db.close();
+    srv = await startServer({ dataDir });
+    db = openDb(dataDir);
+    const ended = db.prepare('SELECT status, result FROM double_rounds WHERE id = ?').get(first.roundId);
+    assert.equal(ended.status, 'ended');
+    assert.equal(ended.result, spin.result);
+    const expected = spin.color === 'white' ? 80_000 : 100_000;
+    assert.equal(balance(db), expected);
+    assert.equal(db.prepare("SELECT COUNT(*) AS c FROM double_bets WHERE status = 'active'").get().c, 0);
+    db.close();
+
+    // 3) Apagado normal (Ctrl+C) mientras se apuesta
+    ({ s } = await connect());
+    await s.waitFor('double:betting', () => true, 30000);
+    assert.ok((await s.emit('double:bet', { color: 'white', amount: 1_000 })).ok);
+    await srv.stop('SIGINT');
+    db = openDb(dataDir);
+    assert.equal(balance(db), expected);
+    assert.equal(db.prepare("SELECT COUNT(*) AS c FROM double_bets WHERE status = 'active'").get().c, 0);
+    db.close();
+  } finally {
+    for (const x of sockets) x.close();
+    await srv.stop('SIGKILL');
+  }
+});
+
+test('🎰 Ruleta: si se corta apostando se devuelven las fichas; si se corta girando, se paga', async () => {
+  let srv = await startServer();
+  const dataDir = srv.dataDir;
+  const sockets = [];
+  try {
+    const admin = new Client(srv.url);
+    assert.equal((await admin.post('/api/auth/login', { username: 'admin', password: 'admin123' })).status, 200);
+    await admin.post('/api/admin/settings', { roulette_betting_seconds: 5, game_roulette: false });
+    await admin.post('/api/admin/settings', { game_roulette: true });
+    const reg = await new Client(srv.url).post('/api/auth/register', { username: 'bolita', password: 'secret1', adult: true });
+    const userId = reg.data.user.id;
+    await admin.post(`/api/admin/users/${userId}/balance`, { op: 'add', amount: 100_000 });
+
+    const connect = async () => {
+      const c = new Client(srv.url);
+      assert.equal((await c.post('/api/auth/login', { username: 'bolita', password: 'secret1' })).status, 200);
+      const s = connectSocket(srv.url, c.cookie);
+      sockets.push(s);
+      const init = await s.ready;
+      return { s, init };
+    };
+    const balance = (db) => db.prepare('SELECT balance FROM users WHERE id = ?').get(userId).balance;
+    const spots = [
+      { type: 'n', value: 17, amount: 2_000 },
+      { type: 'red', amount: 5_000 },
+      { type: 'column', value: 1, amount: 3_000 },
+    ];
+
+    // 1) Corte abrupto mientras se apuesta: las fichas vuelven y la ronda queda para reutilizarse
+    let { s } = await connect();
+    const first = await s.waitFor('roulette:betting', () => true, 40000);
+    assert.ok((await s.emit('roulette:bet', { bets: spots })).ok);
+    await srv.stop('SIGKILL');
+    s.close();
+    srv = await startServer({ dataDir });
+    let db = openDb(dataDir);
+    assert.equal(balance(db), 100_000);
+    assert.equal(db.prepare('SELECT status FROM roulette_bets WHERE round_id = ?').get(first.roundId).status, 'refunded');
+    db.close();
+
+    // 2) Corte abrupto en pleno giro: el número ya se vio, así que la ronda se paga al volver
+    let init;
+    ({ s, init } = await connect());
+    assert.equal(init.roulette.roundId, first.roundId, 'se reutiliza la ronda cuyo resultado nunca se mostró');
+    assert.equal(init.roulette.phase, 'BETTING');
+    assert.ok((await s.emit('roulette:bet', { bets: spots })).ok);
+    const spin = await s.waitFor('roulette:spin', (x) => x.roundId === first.roundId, 40000);
+    await srv.stop('SIGKILL');
+    s.close();
+    db = openDb(dataDir);
+    assert.equal(db.prepare('SELECT status FROM roulette_rounds WHERE id = ?').get(first.roundId).status, 'spinning');
+    db.close();
+    srv = await startServer({ dataDir });
+    db = openDb(dataDir);
+    const ended = db.prepare('SELECT status, result FROM roulette_rounds WHERE id = ?').get(first.roundId);
+    assert.equal(ended.status, 'ended');
+    assert.equal(ended.result, spin.result);
+    const expected = 100_000 - 10_000 + core.roulettePayout(spots, spin.result);
+    assert.equal(balance(db), expected);
+    assert.equal(db.prepare("SELECT COUNT(*) AS c FROM roulette_bets WHERE status = 'active'").get().c, 0);
+    db.close();
+
+    // 3) Apagado normal (Ctrl+C) mientras se apuesta
+    ({ s } = await connect());
+    await s.waitFor('roulette:betting', () => true, 40000);
+    assert.ok((await s.emit('roulette:bet', { bets: [{ type: 'odd', amount: 1_000 }] })).ok);
+    await srv.stop('SIGINT');
+    db = openDb(dataDir);
+    assert.equal(balance(db), expected);
+    assert.equal(db.prepare("SELECT COUNT(*) AS c FROM roulette_bets WHERE status = 'active'").get().c, 0);
+    db.close();
+  } finally {
+    for (const x of sockets) x.close();
+    await srv.stop('SIGKILL');
+  }
 });

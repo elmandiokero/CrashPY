@@ -20,6 +20,8 @@ import {
   errorState,
   loadingState,
   plural,
+  GAME_META,
+  GAME_ORDER,
 } from './admin-core.js';
 import { roundHero, stopButton, totalsStrip } from './admin-live.js';
 
@@ -87,7 +89,7 @@ function profitChart(rows, { xLabel, tipTitle, labelEvery }) {
       h('div', { class: 'tip-title' }, tipTitle(r)),
       h('div', { class: 'tip-row' }, h('span', null, 'Apostado'), h('b', null, fmtGs(r.bet))),
       h('div', { class: 'tip-row' }, h('span', null, 'Pagado'), h('b', null, fmtGs(r.payout))),
-      h('div', { class: 'tip-row' }, h('span', null, 'Rondas'), h('b', null, fmtNum(r.rounds))),
+      h('div', { class: 'tip-row' }, h('span', null, 'Jugadas'), h('b', null, fmtNum(r.rounds))),
     );
     tip.hidden = false;
     const pw = plot.clientWidth;
@@ -147,13 +149,13 @@ function profitChart(rows, { xLabel, tipTitle, labelEvery }) {
     { class: `chart${hasData ? '' : ' is-empty'}` },
     plot,
     xAxis,
-    hasData ? null : h('div', { class: 'chart-empty' }, 'Todavía no hay rondas en este período'),
+    hasData ? null : h('div', { class: 'chart-empty' }, 'Todavía no hay jugadas en este período'),
   );
 }
 
 function chartTable(rows, first) {
   const data = rows.filter((r) => r.rounds > 0).reverse();
-  if (!data.length) return emptyState('Todavía no hay rondas en este período', '📉');
+  if (!data.length) return emptyState('Todavía no hay jugadas en este período', '📉');
   return h(
     'div',
     { class: 'table-wrap chart-table' },
@@ -163,7 +165,7 @@ function chartTable(rows, first) {
       h(
         'thead',
         null,
-        h('tr', null, h('th', null, first), h('th', { class: 'num' }, 'Apostado'), h('th', { class: 'num' }, 'Pagado'), h('th', { class: 'num' }, 'Ganancia'), h('th', { class: 'num' }, 'Rondas')),
+        h('tr', null, h('th', null, first), h('th', { class: 'num' }, 'Apostado'), h('th', { class: 'num' }, 'Pagado'), h('th', { class: 'num' }, 'Ganancia'), h('th', { class: 'num' }, 'Jugadas')),
       ),
       h(
         'tbody',
@@ -241,6 +243,45 @@ function chartCard(title, sub, cls) {
       total.className = `chart-total ${signClass(sum)}`;
       total.textContent = fmtSigned(sum);
       draw();
+    },
+  };
+}
+
+// ───────────────────────── Ganancia por juego ─────────────────────────
+
+function gamesCard() {
+  const list = h('div', { class: 'dg-list' });
+  const el = card('Ganancia por juego', { cls: 'dash-games', icon: 'gamepad', actions: h('a', { class: 'btn btn-ghost btn-sm', href: '#/juegos' }, 'Juegos', icon('chevRight', 15)) }, list);
+  return {
+    el,
+    update(p) {
+      const games = p.games || {};
+      const maxBet = Math.max(1, ...GAME_ORDER.map((id) => (games[id] ? games[id].bet : 0)));
+      const rows = GAME_ORDER.map((id) => ({ id, ...(games[id] || { bet: 0, payout: 0, profit: 0, plays: 0, rounds: 0 }) })).sort((a, b) => b.bet - a.bet);
+      list.replaceChildren(
+        ...rows.map((g) => {
+          const meta = GAME_META[g.id];
+          const margin = g.bet ? (g.profit / g.bet) * 100 : null;
+          return h(
+            'div',
+            { class: `dg-row${g.bet ? '' : ' is-empty'}` },
+            h('span', { class: 'dg-ic' }, meta.icon),
+            h(
+              'div',
+              { class: 'dg-main' },
+              h('div', { class: 'dg-top' }, h('b', null, meta.name), h('span', { class: `num ${signClass(g.profit)}` }, fmtSigned(g.profit))),
+              h('div', { class: 'dg-bar' }, h('span', { style: `width:${((g.bet / maxBet) * 100).toFixed(1)}%` })),
+              h(
+                'small',
+                null,
+                g.bet
+                  ? `${plural(g.plays, 'jugada', 'jugadas')} · apostado ${fmtGs(g.bet)} · pagado ${fmtGs(g.payout)}${margin === null ? '' : ` · margen ${fmtPct(margin)}`}`
+                  : 'Sin jugadas en este período',
+              ),
+            ),
+          );
+        }),
+      );
     },
   };
 }
@@ -416,6 +457,7 @@ export const dashboardView = {
       stop.el,
     );
 
+    const gamesBox = gamesCard();
     const chH = chartCard('Ganancia por hora', 'últimas 24 h', 'dash-ch1');
     const chD = chartCard('Ganancia por día', 'últimos 14 días', 'dash-ch2');
     const online = onlineCard();
@@ -492,17 +534,18 @@ export const dashboardView = {
       heroMeta.replaceChildren(
         h('span', null, 'Margen ', h('b', null, margin === null ? '—' : fmtPct(margin))),
         h('span', null, 'RTP real ', h('b', null, p.bet ? fmtPct((p.payout / p.bet) * 100) : '—')),
-        h('span', null, h('b', null, fmtNum(p.rounds)), ' rondas'),
+        h('span', null, h('b', null, fmtNum(p.plays)), ' jugadas'),
       );
       const net = p.deposits.total - p.withdrawals.total;
       tiles.replaceChildren(
-        tile({ label: 'Apostado', icon: 'rocket', value: fmtGs(p.bet), sub: p.rounds ? `Promedio ${(p.plays / p.rounds).toLocaleString('es-PY', { maximumFractionDigits: 1 })} jugadores por ronda` : 'Sin rondas todavía' }),
+        tile({ label: 'Apostado', icon: 'rocket', value: fmtGs(p.bet), sub: p.plays ? `Promedio ${fmtGs(Math.round(p.bet / p.plays))} por jugada` : 'Sin jugadas todavía' }),
         tile({ label: 'Pagado a jugadores', icon: 'trend', value: fmtGs(p.payout), sub: p.bet ? `${fmtPct((p.payout / p.bet) * 100)} de lo apostado` : '—' }),
-        tile({ label: 'Rondas jugadas', icon: 'clock', value: fmtNum(p.rounds), sub: plural(p.plays, 'participación', 'participaciones') }),
+        tile({ label: 'Jugadas', icon: 'gamepad', value: fmtNum(p.plays), sub: `Crash y Double: ${plural(p.rounds, 'ronda', 'rondas')}`, href: '#/juegos' }),
         tile({ label: 'Depósitos aprobados', icon: 'deposit', value: fmtGs(p.deposits.total), sub: plural(p.deposits.n, 'depósito', 'depósitos'), cls: p.deposits.total ? 'green' : '' }),
         tile({ label: 'Retiros pagados', icon: 'withdraw', value: fmtGs(p.withdrawals.total), sub: plural(p.withdrawals.n, 'retiro', 'retiros') }),
         tile({ label: 'Caja neta', icon: 'wallet', value: fmtSigned(net), sub: 'Depósitos − retiros', cls: signClass(net) }),
       );
+      gamesBox.update(p);
       chH.update(hourlyRows(d.charts.hourly), 'Hora', {
         xLabel: (r) => r.short,
         tipTitle: (r) => r.label,
@@ -539,7 +582,7 @@ export const dashboardView = {
     el.append(
       viewHead('Inicio', 'Así está tu casino ahora mismo.', refreshBtn(load)),
       alerts,
-      h('div', { class: 'dash' }, live, heroCard, tiles, glob, chH.el, chD.el, online.el, activity.el),
+      h('div', { class: 'dash' }, live, heroCard, tiles, gamesBox.el, glob, chH.el, chD.el, online.el, activity.el),
     );
     renderAlerts(alerts);
     renderGlobal();

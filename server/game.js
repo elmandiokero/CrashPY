@@ -235,7 +235,10 @@ class GameEngine extends EventEmitter {
     this._pushHistory({ id: r.id, crash: r.crashPoint, cancelled: false });
     this.lastCrash = { roundId: r.id, crash: r.crashPoint, hash: r.hash, cancelled: false, nextIn: POST_CRASH_MS };
     this.emit('crash', this.lastCrash);
-    for (const bet of losers) this.bus.emit('myBet', bet.userId, this.privateBet(bet));
+    for (const bet of losers) {
+      this.bus.emit('myBet', bet.userId, this.privateBet(bet));
+      this.bus.emit('feed', { game: 'crash', user: bet.username, amount: bet.amount, multiplier: 0, payout: 0, ts: r.endedAt });
+    }
     this.phaseTimer = setTimeout(() => this._safe(() => this._startBetting()), POST_CRASH_MS);
   }
 
@@ -412,10 +415,11 @@ class GameEngine extends EventEmitter {
       payout,
     });
     this.bus.emit('myBet', bet.userId, this.privateBet(bet));
+    this.bus.emit('feed', { game: 'crash', user: bet.username, amount: bet.amount, multiplier: m, payout, ts: Date.now() });
     const bigMult = Math.round(this.settings.get('bigwin_multiplier') * 100);
     const bigAmount = this.settings.get('bigwin_amount');
     if (m >= bigMult || (bigAmount > 0 && payout - bet.amount >= bigAmount)) {
-      this.bus.emit('bigwin', { user: bet.username, userId: bet.userId, amount: bet.amount, cashout: m, payout, roundId: r.id });
+      this.bus.emit('bigwin', { game: 'crash', user: bet.username, userId: bet.userId, amount: bet.amount, cashout: m, payout, roundId: r.id });
     }
     return payout;
   }

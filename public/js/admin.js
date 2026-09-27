@@ -8,10 +8,14 @@ import { depositsView, withdrawalsView } from './admin-money.js';
 import { chatView } from './admin-chat.js';
 import { settingsView, fairView } from './admin-settings.js';
 import { ledgerView, auditView } from './admin-logs.js';
+import { gamesView } from './admin-games.js';
+import { botsView } from './admin-bots.js';
 
 const VIEWS = [
   { id: 'inicio', path: 'inicio', label: 'Inicio', icon: 'grid', group: 'op', mod: dashboardView, bottom: true },
   { id: 'vivo', path: 'en-vivo', label: 'En vivo', icon: 'activity', group: 'op', mod: liveView, bottom: true },
+  { id: 'juegos', path: 'juegos', label: 'Juegos', icon: 'gamepad', group: 'op', mod: gamesView },
+  { id: 'bots', path: 'bots', label: 'Bots', icon: 'bot', group: 'op', mod: botsView },
   { id: 'usuarios', path: 'usuarios', label: 'Usuarios', icon: 'users', group: 'op', mod: usersView, bottom: true },
   { id: 'depositos', path: 'depositos', label: 'Depósitos', icon: 'deposit', group: 'op', mod: depositsView, bottom: true, badge: 'deposits' },
   { id: 'retiros', path: 'retiros', label: 'Retiros', icon: 'withdraw', group: 'op', mod: withdrawalsView, bottom: true, badge: 'withdrawals' },
@@ -562,6 +566,14 @@ function connect() {
   });
   adminSock.on('presence', (p) => bus.emit('presence', p));
   adminSock.on('roundEnd', (d) => bus.emit('roundEnd', d));
+  adminSock.on('doubleEnd', (d) => bus.emit('doubleEnd', d));
+  adminSock.on('rouletteEnd', (d) => bus.emit('rouletteEnd', d));
+  adminSock.on('feed', (batch) => {
+    if (!Array.isArray(batch)) return;
+    for (const f of batch) state.feed.unshift(f);
+    if (state.feed.length > 60) state.feed.length = 60;
+    bus.emit('feed', batch);
+  });
 
   gameSock.on('chat', (m) => bus.emit('chat', m));
   gameSock.on('chatDelete', (d) => bus.emit('chatDelete', d));

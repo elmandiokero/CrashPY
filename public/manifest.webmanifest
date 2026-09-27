@@ -1,7 +1,7 @@
 {
-  "name": "CrashPY · El crash paraguayo",
+  "name": "CrashPY · El casino paraguayo",
   "short_name": "CrashPY",
-  "description": "El crash en tiempo real en guaraníes. Apostá y retirá antes de que explote.",
+  "description": "Crash, Double y Ruleta en vivo, Minas, Penales y Plinko en guaraníes. Todo comprobable.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -9,6 +9,12 @@
   "background_color": "#060913",
   "theme_color": "#060913",
   "lang": "es-PY",
+  "shortcuts": [
+    { "name": "Crash", "url": "/" },
+    { "name": "Minas", "url": "/minas" },
+    { "name": "Penales", "url": "/penales" },
+    { "name": "Double", "url": "/double" }
+  ],
   "icons": [
     { "src": "/img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

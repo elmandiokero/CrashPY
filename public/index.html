@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>CrashPY · El crash paraguayo 🇵🇾</title>
-  <meta name="description" content="CrashPY: el crash en tiempo real en guaraníes. Apostá, mirá cómo sube el cohete y retirá antes de que explote.">
+  <meta name="description" content="CrashPY: el casino paraguayo en guaraníes. Crash, Double y Ruleta en vivo, Minas, Penales de la Albirroja y Plinko, todo comprobable (provably fair).">
   <meta name="theme-color" content="#060913">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,6 +18,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/games.css">
+  <link rel="stylesheet" href="/css/games/mines.css">
+  <link rel="stylesheet" href="/css/games/penalty.css">
+  <link rel="stylesheet" href="/css/games/double.css">
+  <link rel="stylesheet" href="/css/games/plinko.css">
+  <link rel="stylesheet" href="/css/games/roulette.css">
 </head>
 <body>
   <div class="conn-banner" id="connBanner" hidden>Reconectando…</div>
@@ -46,8 +52,18 @@
     </div>
   </header>
 
+  <nav class="game-nav" id="gameNav" aria-label="Juegos">
+    <a href="/" data-game="crash" class="gn-item active" aria-current="page"><span class="gn-icon">🚀</span><span class="gn-name">Crash</span></a>
+    <a href="/minas" data-game="mines" class="gn-item"><span class="gn-icon">💣</span><span class="gn-name">Minas</span></a>
+    <a href="/penales" data-game="penalty" class="gn-item"><span class="gn-icon">⚽</span><span class="gn-name">Penales</span></a>
+    <a href="/double" data-game="double" class="gn-item"><span class="gn-icon">🎡</span><span class="gn-name">Double</span></a>
+    <a href="/plinko" data-game="plinko" class="gn-item"><span class="gn-icon">🔴</span><span class="gn-name">Plinko</span></a>
+    <a href="/ruleta" data-game="roulette" class="gn-item"><span class="gn-icon">🎰</span><span class="gn-name">Ruleta</span></a>
+  </nav>
+
   <main class="layout">
     <section class="game-col">
+      <div class="game-view" data-view="crash">
       <div class="history-bar">
         <div class="history-list" id="historyList"></div>
         <button class="history-more" id="btnHistory" type="button" title="Historial de rondas">🕒</button>
@@ -71,6 +87,12 @@
 
       <div class="bet-panels" id="betPanels"></div>
       <button class="add-panel" id="btnAddPanel" type="button">＋ Agregar segunda apuesta</button>
+      </div>
+      <div class="game-view" data-view="mines" hidden></div>
+      <div class="game-view" data-view="penalty" hidden></div>
+      <div class="game-view" data-view="double" hidden></div>
+      <div class="game-view" data-view="plinko" hidden></div>
+      <div class="game-view" data-view="roulette" hidden></div>
     </section>
 
     <aside class="side-col card" id="sideCol">
@@ -81,12 +103,19 @@
       </div>
       <div class="side-body">
         <div class="tab-pane" data-pane="bets">
-          <div class="bets-summary">
-            <span id="betsPlayers">0 jugadores</span>
-            <span>Total <b id="betsTotal">Gs. 0</b></span>
+          <div class="live-pane" id="crashLive">
+            <div class="bets-summary">
+              <span id="betsPlayers">0 jugadores</span>
+              <span>Total <b id="betsTotal">Gs. 0</b></span>
+            </div>
+            <div class="bets-head"><span>Jugador</span><span class="num">Apuesta</span><span class="num">x</span><span class="num">Ganancia</span></div>
+            <div class="bets-list" id="betsList"></div>
           </div>
-          <div class="bets-head"><span>Jugador</span><span class="num">Apuesta</span><span class="num">x</span><span class="num">Ganancia</span></div>
-          <div class="bets-list" id="betsList"></div>
+          <div class="live-pane" id="feedLive" hidden>
+            <div class="bets-summary"><span>🔥 Jugadas en vivo de todo el casino</span></div>
+            <div class="bets-head"><span>Jugador</span><span class="num">Apuesta</span><span class="num">x</span><span class="num">Ganancia</span></div>
+            <div class="bets-list" id="feedList"></div>
+          </div>
         </div>
         <div class="tab-pane" data-pane="mine" hidden>
           <div class="mine-list" id="mineList"></div>
@@ -159,6 +188,7 @@
   </template>
 
   <script src="/socket.io/socket.io.min.js"></script>
+  <script src="/js/games-core.js"></script>
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

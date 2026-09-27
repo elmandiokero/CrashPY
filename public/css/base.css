@@ -32,6 +32,11 @@
   box-sizing: border-box;
 }
 
+/* "hidden" siempre oculta, aunque la clase del elemento defina otro display */
+[hidden] {
+  display: none !important;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
 }

@@ -1,0 +1,363 @@
+/* ═══════════════ 💣 Minas ═══════════════ */
+
+.mines-stage {
+  padding: 12px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background:
+    radial-gradient(90% 60% at 50% 100%, rgba(20, 199, 154, 0.1), transparent 70%),
+    radial-gradient(120% 90% at 50% 0%, rgba(61, 123, 255, 0.14), transparent 60%),
+    linear-gradient(180deg, #0b1028, #070a1a);
+}
+
+.mines-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: var(--muted);
+  padding: 0 4px;
+}
+
+.mines-info b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.mines-info .mi-sep {
+  margin: 0 7px;
+  color: var(--faint);
+}
+
+/* Escalera de multiplicadores */
+.mines-ladder {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 2px 4px;
+  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 92%, transparent);
+}
+
+.mines-ladder::-webkit-scrollbar {
+  display: none;
+}
+
+.ml-step {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 58px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  font-weight: 800;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: #aab2dc;
+  transition: background 0.25s, border-color 0.25s, color 0.25s, transform 0.25s;
+}
+
+.ml-step small {
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--faint);
+}
+
+.ml-step.done {
+  color: #7ff0c9;
+  background: rgba(20, 199, 154, 0.12);
+  border-color: rgba(20, 199, 154, 0.35);
+}
+
+.ml-step.next {
+  color: #fff;
+  background: rgba(255, 197, 61, 0.14);
+  border-color: rgba(255, 197, 61, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(255, 197, 61, 0.18);
+}
+
+/* Tablero */
+.mines-board {
+  display: flex;
+  justify-content: center;
+}
+
+.mines-grid {
+  width: 100%;
+  max-width: 470px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(6px, 1.8vw, 10px);
+  perspective: 900px;
+}
+
+.mtile {
+  position: relative;
+  aspect-ratio: 1;
+  border: 0;
+  padding: 0;
+  border-radius: clamp(10px, 2.6vw, 14px);
+  background: linear-gradient(180deg, #2f3a70 0%, #232b56 55%, #1b2247 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.28),
+    0 6px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 0.14s ease, box-shadow 0.2s, background 0.25s, filter 0.2s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: default;
+  overflow: visible;
+}
+
+.mt-face {
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.09), transparent 65%);
+  transition: opacity 0.2s;
+}
+
+.mines-grid.playing .mtile:not(:disabled) {
+  cursor: pointer;
+}
+
+.mines-grid:not(.playing) .mtile:not(.gem):not(.mine):not(.hit) {
+  filter: brightness(0.85) saturate(0.85);
+}
+
+@media (hover: hover) {
+  .mines-grid.playing .mtile:not(:disabled):hover {
+    transform: translateY(-3px);
+    background: linear-gradient(180deg, #3a4687 0%, #2b3468 55%, #212a58 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -4px 0 rgba(0, 0, 0, 0.28),
+      0 10px 22px rgba(61, 123, 255, 0.28);
+  }
+}
+
+.mines-grid.playing .mtile:not(:disabled):active {
+  transform: scale(0.94);
+}
+
+.mtile.pending {
+  animation: mtPending 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes mtPending {
+  to {
+    filter: brightness(1.35);
+    transform: scale(0.95);
+  }
+}
+
+.mt-content {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.mt-svg,
+.mt-burst {
+  grid-area: 1 / 1;
+  width: 62%;
+  height: 62%;
+}
+
+.mt-burst {
+  width: 96%;
+  height: 96%;
+  opacity: 0;
+}
+
+/* Diamante encontrado */
+.mtile.gem {
+  background: linear-gradient(180deg, #0f3b3a 0%, #0c2c33 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(20, 199, 154, 0.55),
+    inset 0 6px 16px rgba(0, 0, 0, 0.45),
+    0 0 18px rgba(20, 199, 154, 0.28);
+}
+
+.mtile.gem .mt-face,
+.mtile.mine .mt-face,
+.mtile.hit .mt-face {
+  opacity: 0;
+}
+
+.mtile.gem .mt-svg {
+  animation: gemPop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  filter: drop-shadow(0 4px 10px rgba(20, 199, 154, 0.55));
+}
+
+.mtile.gem::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 2px solid rgba(127, 240, 201, 0.9);
+  opacity: 0;
+  animation: gemRing 0.55s ease-out;
+  pointer-events: none;
+}
+
+@keyframes gemPop {
+  0% {
+    transform: scale(0.2) rotate(-25deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+
+@keyframes gemRing {
+  0% {
+    opacity: 1;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+
+/* Mina */
+.mtile.mine {
+  background: linear-gradient(180deg, #3a1a2a 0%, #2a1320 100%);
+  box-shadow: inset 0 0 0 2px rgba(255, 59, 78, 0.35), inset 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+.mtile.hit {
+  background: radial-gradient(circle at 50% 50%, #ff6a3d 0%, #d41f3d 55%, #7a0f24 100%);
+  box-shadow: inset 0 0 0 2px #ffd0d6, 0 0 30px rgba(255, 59, 78, 0.7);
+  z-index: 2;
+  animation: hitShake 0.45s ease;
+}
+
+.mtile.hit .mt-burst {
+  animation: burst 0.7s ease-out both;
+}
+
+.mtile.hit .mt-svg {
+  animation: gemPop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.6));
+}
+
+@keyframes burst {
+  0% {
+    opacity: 1;
+    transform: scale(0.3) rotate(0);
+  }
+  60% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.7) rotate(45deg);
+  }
+}
+
+@keyframes hitShake {
+  20% {
+    transform: translate(-3px, 1px) rotate(-3deg);
+  }
+  40% {
+    transform: translate(3px, -1px) rotate(3deg);
+  }
+  60% {
+    transform: translate(-2px, 1px) rotate(-2deg);
+  }
+  80% {
+    transform: translate(2px, 0) rotate(1deg);
+  }
+}
+
+/* Al terminar se muestra el resto del tablero, más apagado */
+.mtile.dim {
+  filter: saturate(0.55) brightness(0.72);
+}
+
+.mtile.dim .mt-svg {
+  width: 48%;
+  height: 48%;
+}
+
+.mtile.late .mt-svg {
+  animation: gemPop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  animation-delay: inherit;
+}
+
+.mtile.gem.dim::after {
+  display: none;
+}
+
+.mines-stage.shake {
+  animation: stageShake 0.5s ease;
+}
+
+@keyframes stageShake {
+  15% {
+    transform: translate(-6px, 2px);
+  }
+  30% {
+    transform: translate(6px, -2px);
+  }
+  45% {
+    transform: translate(-4px, 1px);
+  }
+  60% {
+    transform: translate(4px, -1px);
+  }
+  80% {
+    transform: translate(-2px, 0);
+  }
+}
+
+/* Panel */
+.mines-ctl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mines-count-wrap {
+  flex: 1;
+  text-align: center;
+}
+
+.mines-count {
+  font-size: 1.02rem;
+  font-weight: 800;
+}
+
+.mines-quick button.active {
+  background: rgba(255, 59, 78, 0.18);
+  border-color: rgba(255, 59, 78, 0.55);
+  color: #fff;
+}
+
+.mines-ctl.locked {
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mtile,
+  .mtile .mt-svg,
+  .mtile.gem::after,
+  .mtile.hit,
+  .mtile.hit .mt-burst,
+  .mines-stage.shake {
+    animation: none !important;
+    transition: none;
+  }
+}

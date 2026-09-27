@@ -5,6 +5,8 @@ const express = require('express');
 const { AppError, cleanText, clientIp, fmtGs, fmtMult } = require('../util');
 const { hashPassword, requireAdmin } = require('../auth');
 const stats = require('../stats');
+const core = require('../../public/js/games-core.js');
+const { spotsLabel } = require('../games/roulette');
 
 const PAGE = 50;
 const USER_SORTS = {
@@ -26,8 +28,88 @@ const toId = (v) => {
 };
 const pageOf = (req) => Math.max(0, (parseInt(req.query.page, 10) || 1) - 1);
 
+const parseJSON = (s) => {
+  try {
+    return s ? JSON.parse(s) : {};
+  } catch {
+    return {};
+  }
+};
+const COLOR_NAMES = { red: '🔴 rojo', black: '⚫ negro', white: '⚪ blanco' };
+const ROULETTE_EMOJI = { red: '🔴', black: '⚫', green: '🟢' };
+const RISK_NAMES = { low: 'bajo', medium: 'medio', high: 'alto' };
+const GAME_KEYS = new Set(['mines', 'penalty', 'plinko', 'roulette', 'double']);
+
+/**
+ * Jugadas de todos los juegos (menos el Crash, que tiene su propia tabla) con la misma forma.
+ * En la Ruleta, "params" son las fichas de la apuesta. El resultado de una ronda se muestra recién cuando empezó a girar.
+ */
+const UNIFIED_PLAYS = `
+  SELECT p.id, p.game, p.user_id, p.amount, p.multiplier, p.payout, p.status, p.created_at, p.ended_at,
+         p.params, p.state, p.result, NULL AS color, NULL AS round_id, NULL AS round_result
+  FROM plays p
+  UNION ALL
+  SELECT d.id, 'double', d.user_id, d.amount,
+         CASE WHEN d.status = 'won' THEN (d.payout * 100) / d.amount ELSE 0 END,
+         d.payout, d.status, d.created_at, r.ended_at, NULL, NULL, NULL, d.color, d.round_id,
+         CASE WHEN r.status IN ('spinning', 'ended', 'cancelled') THEN r.result END
+  FROM double_bets d JOIN double_rounds r ON r.id = d.round_id
+  UNION ALL
+  SELECT b.id, 'roulette', b.user_id, b.amount,
+         CASE WHEN b.status = 'won' THEN (b.payout * 100) / b.amount ELSE 0 END,
+         b.payout, b.status, b.created_at, r.ended_at, b.bets, NULL, NULL, NULL, b.round_id,
+         CASE WHEN r.status IN ('spinning', 'ended', 'cancelled') THEN r.result END
+  FROM roulette_bets b JOIN roulette_rounds r ON r.id = b.round_id`;
+
+/** Resumen corto de la jugada para las tablas del panel (nunca muestra el resultado de una partida en curso). */
+function describePlay(row) {
+  const params = parseJSON(row.params);
+  const state = parseJSON(row.state);
+  const result = parseJSON(row.result);
+  switch (row.game) {
+    case 'mines': {
+      const n = (state.revealed || []).length - (state.hit !== undefined && state.hit !== null ? 1 : 0);
+      return `${params.mines} minas · ${n} destapada${n === 1 ? '' : 's'}${state.hit !== undefined && state.hit !== null ? ' · 💥' : ''}`;
+    }
+    case 'penalty': {
+      const kicks = state.kicks || [];
+      const goals = kicks.filter((k) => k.goal).length;
+      return `${goals} gol${goals === 1 ? '' : 'es'}${kicks.some((k) => !k.goal) ? ' · atajado 🧤' : ''}`;
+    }
+    case 'plinko':
+      return `${params.rows} filas · riesgo ${RISK_NAMES[params.risk] || params.risk}`;
+    case 'roulette': {
+      const spots = Array.isArray(params) ? params : params.bets || [];
+      const n = row.round_result ?? result.number;
+      const shown = n !== null && n !== undefined && row.status !== 'refunded';
+      return `${spotsLabel(spots, 2) || 'sin fichas'}${shown ? ` · salió el ${n} ${ROULETTE_EMOJI[core.rouletteColor(n)]}` : ''}`;
+    }
+    case 'double':
+      return `${COLOR_NAMES[row.color] || row.color}${
+        row.round_result !== null && row.round_result !== undefined ? ` · salió ${COLOR_NAMES[core.doubleColor(row.round_result)]}` : ''
+      }`;
+    default:
+      return '';
+  }
+}
+
+const playView = (row) => ({
+  id: row.id,
+  game: row.game,
+  user_id: row.user_id,
+  username: row.username,
+  amount: row.amount,
+  multiplier: row.multiplier,
+  payout: row.payout,
+  status: row.status,
+  created_at: row.created_at,
+  ended_at: row.ended_at,
+  round_id: row.round_id,
+  detail: describePlay(row),
+});
+
 module.exports = function adminRoutes(ctx) {
-  const { db, auth, wallet, settings, chains, engine, chat, bus } = ctx;
+  const { db, auth, wallet, settings, chains, engine, chat, bus, double, doubleChains, roulette, rouletteChains } = ctx;
   const router = express.Router();
   router.use(requireAdmin);
 
@@ -57,7 +139,11 @@ module.exports = function adminRoutes(ctx) {
       stats: stats.overview(db),
       charts: stats.charts(db),
       game: engine.adminState(),
+      double: double.adminState(),
+      roulette: roulette.adminState(),
       fair: chains.summary(),
+      doubleFair: doubleChains.summary(),
+      rouletteFair: rouletteChains.summary(),
       online: ctx.presence ? ctx.presence.list().length : 0,
       connections: ctx.presence ? ctx.presence.connections() : 0,
     });
@@ -130,12 +216,16 @@ module.exports = function adminRoutes(ctx) {
       'SELECT created_at, expires_at, ip, ua FROM sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 10',
       id,
     );
+    const games = db
+      .all(`SELECT x.* FROM (${UNIFIED_PLAYS}) x WHERE x.user_id = ? ORDER BY x.created_at DESC, x.id DESC LIMIT 60`, id)
+      .map(playView);
     const sameIp = user.last_ip
       ? db.all('SELECT id, username FROM users WHERE (last_ip = ? OR created_ip = ?) AND id != ? LIMIT 20', user.last_ip, user.last_ip, id)
       : [];
     res.json({
       user: { ...user, online: ctx.presence ? ctx.presence.isOnline(id) : false },
       bets,
+      games,
       ledger,
       deposits,
       withdrawals,
@@ -318,6 +408,59 @@ module.exports = function adminRoutes(ctx) {
       page * PAGE,
     );
     res.json({ items, total, page: page + 1, pages: Math.max(1, Math.ceil(total / PAGE)) });
+  });
+
+  /** Jugadas de Minas, Penales, Plinko, Ruleta y Double de todos los jugadores. */
+  router.get('/plays', (req, res) => {
+    const game = String(req.query.game || '');
+    const status = String(req.query.status || '');
+    const q = cleanText(req.query.q, 40);
+    const where = [];
+    const params = [];
+    if (GAME_KEYS.has(game)) {
+      where.push('x.game = ?');
+      params.push(game);
+    }
+    if (['active', 'won', 'lost', 'refunded'].includes(status)) {
+      where.push('x.status = ?');
+      params.push(status);
+    }
+    if (q) {
+      where.push('u.username LIKE ?');
+      params.push(`%${q}%`);
+    }
+    const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    const from = `FROM (${UNIFIED_PLAYS}) x JOIN users u ON u.id = x.user_id ${w}`;
+    const total = db.get(`SELECT COUNT(*) AS c ${from}`, ...params).c;
+    const page = pageOf(req);
+    const items = db
+      .all(`SELECT x.*, u.username ${from} ORDER BY x.created_at DESC, x.id DESC LIMIT ? OFFSET ?`, ...params, PAGE, page * PAGE)
+      .map(playView);
+    res.json({ items, total, page: page + 1, pages: Math.max(1, Math.ceil(total / PAGE)) });
+  });
+
+  router.get('/bots', (req, res) => {
+    res.json(ctx.bots.report());
+  });
+
+  router.get('/double', (req, res) => {
+    const items = db.all(
+      `SELECT id, chain_id, chain_index, hash, result, status, spun_at, ended_at, total_bet, total_payout, total_refund, players
+       FROM double_rounds WHERE status IN ('ended', 'cancelled') ORDER BY id DESC LIMIT ? OFFSET ?`,
+      PAGE,
+      pageOf(req) * PAGE,
+    );
+    res.json({ double: double.adminState(), fair: doubleChains.summary(), items });
+  });
+
+  router.get('/roulette', (req, res) => {
+    const items = db.all(
+      `SELECT id, chain_id, chain_index, hash, result, status, spun_at, ended_at, total_bet, total_payout, total_refund, players
+       FROM roulette_rounds WHERE status IN ('ended', 'cancelled') ORDER BY id DESC LIMIT ? OFFSET ?`,
+      PAGE,
+      pageOf(req) * PAGE,
+    );
+    res.json({ roulette: roulette.adminState(), fair: rouletteChains.summary(), items });
   });
 
   router.post('/game/stop', (req, res) => {

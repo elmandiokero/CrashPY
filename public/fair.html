@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Provably Fair · CrashPY</title>
-  <meta name="description" content="Cómo verificar que cada ronda de CrashPY es justa: cadena de hashes SHA-256 publicada de antemano.">
+  <meta name="description" content="Cómo verificar que cada ronda y cada jugada de CrashPY es justa: cadenas de hashes SHA-256 publicadas de antemano y semillas del jugador.">
   <meta name="theme-color" content="#060913">
   <link rel="icon" href="/img/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
@@ -17,18 +17,26 @@
 <body>
   <header class="fair-top">
     <a class="fair-logo" href="/"><img src="/img/icon.svg" alt="" width="32" height="32"> <span>Crash<b>PY</b></span></a>
-    <a class="btn btn-primary btn-sm" href="/">🚀 Volver a jugar</a>
+    <a class="btn btn-primary btn-sm" href="/">🎮 Volver a jugar</a>
   </header>
 
   <main class="fair-main">
     <section class="fair-hero">
       <div class="fair-badge">🔐 Provably Fair</div>
-      <h1>Cada ronda se puede comprobar</h1>
-      <p>Los resultados de CrashPY no se inventan en el momento: salen de una cadena de hashes que se publica <b>antes</b> de jugar. Ni el casino puede cambiar una ronda sin que se note.</p>
+      <h1>Cada resultado se puede comprobar</h1>
+      <p>Los resultados de CrashPY no se inventan en el momento: quedan fijados <b>antes</b> de jugar con criptografía (SHA-256), y después cualquiera los puede recalcular. Ni el casino puede cambiar una ronda o una jugada sin que se note.</p>
     </section>
 
+    <nav class="fair-tabs" id="fairTabs" aria-label="Juegos">
+      <button type="button" data-tab="crash" class="active">🚀 Crash</button>
+      <button type="button" data-tab="double">🎡 Double</button>
+      <button type="button" data-tab="roulette">🎰 Ruleta</button>
+      <button type="button" data-tab="seeds">🎲 Minas · Penales · Plinko</button>
+    </nav>
+
+    <div class="fair-pane" data-pane="crash">
     <section class="card fair-card">
-      <h2>¿Cómo funciona?</h2>
+      <h2>¿Cómo funciona el Crash?</h2>
       <ol class="fair-steps">
         <li><b>Semilla secreta.</b> El servidor genera una semilla al azar y le aplica SHA-256 una y otra vez, formando una cadena de hasta 1.000.000 de hashes.</li>
         <li><b>Se publica el final.</b> El último eslabón (el <i>hash terminal</i>) se publica acá abajo antes de la primera ronda.</li>
@@ -90,9 +98,198 @@ prev = lambda h: hashlib.sha256(h.encode()).hexdigest()</pre>
       <h2>Cadenas terminadas (semilla revelada)</h2>
       <div id="prevChains"></div>
     </section>
+    </div>
+
+    <div class="fair-pane" data-pane="double" hidden>
+      <section class="card fair-card">
+        <h2>¿Cómo funciona el Double?</h2>
+        <ol class="fair-steps">
+          <li><b>Su propia cadena.</b> Igual que el Crash, el Double usa una cadena de hashes SHA-256 cuyo último eslabón (<i>hash terminal</i>) se publica antes de la primera ronda. Cada ronda usa el eslabón anterior.</li>
+          <li><b>31 casillas.</b> La casilla <b>0 es blanca</b> (paga 30x), las <b>impares son rojas</b> y las <b>pares son negras</b> (pagan 2x). Retorno para el jugador: 96,77% en cualquier color.</li>
+          <li><b>Se revela al girar.</b> Las apuestas se cierran, la rueda gira y en ese momento se publica el hash de la ronda. Cualquiera puede recalcular la casilla.</li>
+        </ol>
+        <div class="formula">
+          <div class="formula-title">Fórmula</div>
+<pre>hmac    = HMAC_SHA256(clave = sal, mensaje = hash_de_la_ronda)
+r       = primeros 13 caracteres hex de hmac  (52 bits)
+casilla = floor( r / 2^52 × 31 )          → 0 a 30
+color   = 0 → blanco · impar → rojo · par → negro</pre>
+        </div>
+      </section>
+
+      <section class="card fair-card">
+        <h2>Cadena actual del Double</h2>
+        <div id="dChainInfo"><div class="empty"><span class="spinner"></span></div></div>
+      </section>
+
+      <section class="card fair-card">
+        <h2>Verificador del Double</h2>
+        <p class="muted">Pegá el hash de una ronda (tocá cualquier resultado del historial en el Double). Todo se calcula en tu dispositivo.</p>
+        <form id="dVerifyForm" class="verify-form" autocomplete="off">
+          <div class="field"><label for="dHash">Hash de la ronda</label><input class="input mono" id="dHash" placeholder="64 caracteres hexadecimales" spellcheck="false"></div>
+          <div class="field-row">
+            <div class="field"><label for="dSalt">Sal (salt)</label><input class="input mono" id="dSalt" spellcheck="false"></div>
+            <div class="field"><label for="dCount">Rondas anteriores a mostrar</label><input class="input" id="dCount" inputmode="numeric" value="20"></div>
+          </div>
+          <button class="btn btn-blue btn-block" type="submit">Calcular</button>
+        </form>
+        <div id="dVerifyOut"></div>
+      </section>
+
+      <section class="card fair-card">
+        <h2>Verificalo con tu propio código</h2>
+        <div class="code-title">JavaScript (Node.js)</div>
+<pre class="code">const crypto = require('crypto');
+function tile(hash, salt) {
+  const hmac = crypto.createHmac('sha256', salt).update(hash).digest('hex');
+  return Math.floor(parseInt(hmac.slice(0, 13), 16) / 2 ** 52 * 31);
+}
+const color = (n) => (n === 0 ? 'blanco' : n % 2 ? 'rojo' : 'negro');</pre>
+        <div class="code-title">Python</div>
+<pre class="code">import hmac, hashlib
+def tile(game_hash, salt):
+    h = hmac.new(salt.encode(), game_hash.encode(), hashlib.sha256).hexdigest()
+    return int(int(h[:13], 16) / 2**52 * 31)</pre>
+      </section>
+
+      <section class="card fair-card" id="dPrevCard" hidden>
+        <h2>Cadenas terminadas del Double (semilla revelada)</h2>
+        <div id="dPrevChains"></div>
+      </section>
+    </div>
+
+    <div class="fair-pane" data-pane="roulette" hidden>
+      <section class="card fair-card">
+        <h2>¿Cómo funciona la Ruleta en vivo?</h2>
+        <ol class="fair-steps">
+          <li><b>Una bolita para todos.</b> La Ruleta es en vivo: todos apuestan en la misma ronda durante la cuenta regresiva y el mismo número decide para todos.</li>
+          <li><b>Su propia cadena.</b> Igual que el Crash y el Double, usa una cadena de hashes SHA-256 cuyo último eslabón (<i>hash terminal</i>) se publica antes de la primera ronda. Cada ronda usa el eslabón anterior, así que el número de cada ronda ya estaba fijado antes de que nadie apueste.</li>
+          <li><b>Ruleta europea.</b> 37 números (0 a 36) con un solo cero. Pleno paga 36x; docena y columna 3x; rojo, negro, par, impar, 1 a 18 y 19 a 36 pagan 2x. Retorno para el jugador: 97,30% en cualquier apuesta.</li>
+          <li><b>Se revela al girar.</b> Las apuestas se cierran, la bolita gira y en ese momento se publica el hash de la ronda. Cualquiera puede recalcular el número.</li>
+        </ol>
+        <div class="formula">
+          <div class="formula-title">Fórmula</div>
+<pre>hmac   = HMAC_SHA256(clave = sal, mensaje = hash_de_la_ronda)
+r      = primeros 13 caracteres hex de hmac  (52 bits)
+número = floor( r / 2^52 × 37 )          → 0 a 36
+rojos  = 1 3 5 7 9 12 14 16 18 19 21 23 25 27 30 32 34 36 · el 0 es verde</pre>
+        </div>
+      </section>
+
+      <section class="card fair-card">
+        <h2>Cadena actual de la Ruleta</h2>
+        <div id="rChainInfo"><div class="empty"><span class="spinner"></span></div></div>
+      </section>
+
+      <section class="card fair-card">
+        <h2>Verificador de la Ruleta</h2>
+        <p class="muted">Pegá el hash de una ronda (tocá cualquier número del historial en la Ruleta). Todo se calcula en tu dispositivo.</p>
+        <form id="rVerifyForm" class="verify-form" autocomplete="off">
+          <div class="field"><label for="rHash">Hash de la ronda</label><input class="input mono" id="rHash" placeholder="64 caracteres hexadecimales" spellcheck="false"></div>
+          <div class="field-row">
+            <div class="field"><label for="rSalt">Sal (salt)</label><input class="input mono" id="rSalt" spellcheck="false"></div>
+            <div class="field"><label for="rCount">Rondas anteriores a mostrar</label><input class="input" id="rCount" inputmode="numeric" value="20"></div>
+          </div>
+          <button class="btn btn-blue btn-block" type="submit">Calcular</button>
+        </form>
+        <div id="rVerifyOut"></div>
+      </section>
+
+      <section class="card fair-card">
+        <h2>Verificalo con tu propio código</h2>
+        <div class="code-title">JavaScript (Node.js)</div>
+<pre class="code">const crypto = require('crypto');
+function number(hash, salt) {
+  const hmac = crypto.createHmac('sha256', salt).update(hash).digest('hex');
+  return Math.floor(parseInt(hmac.slice(0, 13), 16) / 2 ** 52 * 37);
+}</pre>
+        <div class="code-title">Python</div>
+<pre class="code">import hmac, hashlib
+def number(game_hash, salt):
+    h = hmac.new(salt.encode(), game_hash.encode(), hashlib.sha256).hexdigest()
+    return int(int(h[:13], 16) / 2**52 * 37)</pre>
+      </section>
+
+      <section class="card fair-card" id="rPrevCard" hidden>
+        <h2>Cadenas terminadas de la Ruleta (semilla revelada)</h2>
+        <div id="rPrevChains"></div>
+      </section>
+    </div>
+
+    <div class="fair-pane" data-pane="seeds" hidden>
+      <section class="card fair-card">
+        <h2>¿Cómo funcionan Minas, Penales y Plinko?</h2>
+        <ol class="fair-steps">
+          <li><b>Semilla del servidor.</b> Antes de jugar, el servidor elige una semilla secreta para vos y te muestra su <b>hash SHA-256</b> (en el juego: 🔐 Justo → Mis semillas). Con el hash publicado, la semilla ya no se puede cambiar.</li>
+          <li><b>Tu semilla.</b> Vos elegís tu propia semilla (o usás la que se generó al azar). Así el casino tampoco puede elegir resultados a su favor.</li>
+          <li><b>Nonce.</b> Cada jugada usa el siguiente número (0, 1, 2…), así cada resultado es distinto.</li>
+          <li><b>Revelación.</b> Cuando cambiás tus semillas, la del servidor se revela: comprobás que su SHA-256 es el hash que viste y recalculás cada jugada acá.</li>
+        </ol>
+        <div class="formula">
+          <div class="formula-title">Números al azar</div>
+<pre>bytes  = HMAC_SHA256(clave = semilla_servidor, mensaje = "semilla_cliente:nonce:ronda")   (ronda = 0, 1, 2…)
+número = b0/256 + b1/256² + b2/256³ + b3/256⁴      (cada 4 bytes → un número entre 0 y 1; 8 números por ronda)
+
+💣 Minas:   se mezclan las 25 casillas (0 a 24) tomando del lote la posición floor(número × restantes);
+            las primeras N casillas elegidas son las minas.
+⚽ Penales: el arquero se tira en floor(número × 3) para cada uno de los 5 penales (0 izquierda, 1 centro, 2 derecha).
+🔴 Plinko:  en cada fila, número &lt; 0,5 → izquierda; si no → derecha. La casilla es la cantidad de "derechas".</pre>
+        </div>
+      </section>
+
+      <section class="card fair-card">
+        <h2>Verificador de jugadas</h2>
+        <p class="muted">Pegá las semillas (en el juego: 🔐 Justo → Mis semillas → semillas anteriores) y el nonce de la jugada. Todo se calcula en tu dispositivo.</p>
+        <form id="sVerifyForm" class="verify-form" autocomplete="off">
+          <div class="field-row">
+            <div class="field"><label for="sGame">Juego</label>
+              <select class="input" id="sGame">
+                <option value="mines">💣 Minas</option>
+                <option value="penalty">⚽ Penales</option>
+                <option value="plinko">🔴 Plinko</option>
+              </select>
+            </div>
+            <div class="field"><label for="sNonce">Nonce (número de jugada)</label><input class="input" id="sNonce" inputmode="numeric" value="0"></div>
+          </div>
+          <div class="field"><label for="sServer">Semilla del servidor (revelada)</label><input class="input mono" id="sServer" placeholder="64 caracteres hexadecimales" spellcheck="false"></div>
+          <div class="field"><label for="sClient">Tu semilla (cliente)</label><input class="input mono" id="sClient" spellcheck="false"></div>
+          <div class="field-row" id="sOptsMines">
+            <div class="field"><label for="sMines">Cantidad de minas</label><input class="input" id="sMines" inputmode="numeric" value="3"></div>
+          </div>
+          <div class="field-row" id="sOptsPlinko" hidden>
+            <div class="field"><label for="sRows">Filas</label>
+              <select class="input" id="sRows"><option>8</option><option>10</option><option>12</option><option>14</option><option selected>16</option></select>
+            </div>
+            <div class="field"><label for="sRisk">Riesgo</label>
+              <select class="input" id="sRisk"><option value="low">Bajo</option><option value="medium" selected>Medio</option><option value="high">Alto</option></select>
+            </div>
+          </div>
+          <button class="btn btn-blue btn-block" type="submit">Calcular</button>
+        </form>
+        <div id="sVerifyOut"></div>
+      </section>
+
+      <section class="card fair-card">
+        <h2>Verificalo con tu propio código</h2>
+        <div class="code-title">JavaScript (Node.js)</div>
+<pre class="code">const crypto = require('crypto');
+function numbers(serverSeed, clientSeed, nonce, count) {
+  const out = [];
+  for (let round = 0; out.length &lt; count; round++) {
+    const b = crypto.createHmac('sha256', serverSeed).update(`${clientSeed}:${nonce}:${round}`).digest();
+    for (let i = 0; i + 4 &lt;= 32 &amp;&amp; out.length &lt; count; i += 4)
+      out.push(b[i] / 256 + b[i + 1] / 65536 + b[i + 2] / 16777216 + b[i + 3] / 4294967296);
+  }
+  return out;
+}
+const rouletteNumber = (s, c, n) => Math.floor(numbers(s, c, n, 1)[0] * 37);
+const hashOk = (serverSeed, hash) => crypto.createHash('sha256').update(serverSeed).digest('hex') === hash;</pre>
+      </section>
+    </div>
   </main>
 
   <footer class="fair-foot">🇵🇾 CrashPY · +18 · Jugá con responsabilidad</footer>
+  <script src="/js/games-core.js"></script>
   <script type="module" src="/js/fair-page.js"></script>
 </body>
 </html>
