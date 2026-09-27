@@ -3,7 +3,12 @@
 Juego **Crash** multijugador en **guaraníes (PYG)** que corre en tu PC y se juega desde el celular a través de **Cloudflare Tunnel**.
 Incluye resultados **comprobables (provably fair)**, **chat**, **depósitos y retiros por transferencia** y un **panel de administración en tiempo real**.
 
-![CrashPY](public/img/icon-192.png)
+<p align="center">
+  <img src="docs/juego-celular.jpg" alt="CrashPY en el celular" width="260">
+  <img src="docs/admin-celular.jpg" alt="Panel de admin en el celular" width="260">
+</p>
+
+![CrashPY en la PC](docs/juego-pc.jpg)
 
 ## ✨ Qué trae
 

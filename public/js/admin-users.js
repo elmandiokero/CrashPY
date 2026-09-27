@@ -35,7 +35,6 @@ import {
   signClass,
   setText,
   notifyError,
-  plural,
   copyBtn,
 } from './admin-core.js';
 import { approveDeposit, rejectDeposit, payWithdrawal, rejectWithdrawal } from './admin-money.js';
@@ -154,6 +153,7 @@ export const usersView = {
         list.replaceChildren(
           dataTable(USER_COLS, res.items, {
             onRow: (u) => openUserDetail(u.id),
+            compact: true,
             empty: uq.q || uq.filter ? 'No hay usuarios con ese filtro' : 'Todavía no hay usuarios registrados',
             emptyEmoji: '🔎',
             rowClass: (u) => (u.banned ? 'row-banned' : ''),
@@ -663,7 +663,7 @@ function noteEditor(u) {
 // ── Pestañas de historial
 
 const BET_COLS = [
-  { label: 'Ronda', main: true, render: (b) => h('span', { class: 'round-id' }, `Ronda #${fmtNum(b.round_id)}`) },
+  { label: 'Ronda', main: true, render: (b) => h('span', { class: 'round-id' }, `Ronda #${b.round_id}`) },
   { label: 'Monto', cls: 'num', render: (b) => fmtGs(b.amount) },
   {
     label: 'Retiro',
@@ -685,7 +685,7 @@ export const LEDGER_COLS = [
   { label: 'Tipo', main: true, render: (l) => ledgerChip(l.type) },
   { label: 'Monto', cls: 'num', render: (l) => signedMoney(l.amount) },
   { label: 'Saldo después', cls: 'num', render: (l) => fmtGs(l.balance_after) },
-  { label: 'Nota', cls: 'wrap-cell', render: (l) => l.note },
+  { label: 'Nota', cls: 'wrap-cell', full: true, render: (l) => l.note },
   { label: 'Admin', render: (l) => (l.admin ? h('span', { class: 'chip chip-gold' }, l.admin) : null) },
   { label: 'Fecha', cls: 'num', render: (l) => fmtDate(l.created_at) },
 ];
@@ -748,13 +748,13 @@ function tabContent(tab, u) {
   const d = D.data;
   switch (tab) {
     case 'bets':
-      return dataTable(BET_COLS, d.bets, { empty: 'Todavía no apostó', emptyEmoji: '🎯' });
+      return dataTable(BET_COLS, d.bets, { empty: 'Todavía no apostó', emptyEmoji: '🎯', compact: true, mobileLimit: 15 });
     case 'ledger':
-      return dataTable(LEDGER_COLS, d.ledger, { empty: 'Sin movimientos de saldo', emptyEmoji: '📒' });
+      return dataTable(LEDGER_COLS, d.ledger, { empty: 'Sin movimientos de saldo', emptyEmoji: '📒', compact: true, mobileLimit: 15 });
     case 'deposits':
-      return dataTable(depositCols(u), d.deposits, { empty: 'No informó depósitos', emptyEmoji: '💰' });
+      return dataTable(depositCols(u), d.deposits, { empty: 'No informó depósitos', emptyEmoji: '💰', mobileLimit: 10 });
     case 'withdrawals':
-      return dataTable(withdrawalCols(u), d.withdrawals, { empty: 'No pidió retiros', emptyEmoji: '🏦' });
+      return dataTable(withdrawalCols(u), d.withdrawals, { empty: 'No pidió retiros', emptyEmoji: '🏦', mobileLimit: 10 });
     case 'sessions':
       return h(
         'div',

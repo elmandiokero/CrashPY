@@ -115,6 +115,16 @@ module.exports = function publicRoutes(ctx) {
     if (next.length > 100) throw new AppError('La contraseña es demasiado larga');
     db.run('UPDATE users SET pass_hash = ? WHERE id = ?', await hashPassword(next), req.user.id);
     auth.destroyUserSessions(req.user.id, auth.tokenFromRequest(req));
+    if (req.user.role === 'admin') {
+      db.run(
+        "INSERT INTO audit (admin_id, admin_name, action, target_user_id, details, ip, created_at) VALUES (?, ?, 'own_password', ?, NULL, ?, ?)",
+        req.user.id,
+        req.user.username,
+        req.user.id,
+        ipOf(req),
+        Date.now(),
+      );
+    }
     res.json({ ok: true });
   });
 

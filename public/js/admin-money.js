@@ -146,7 +146,7 @@ export function payWithdrawal(w, onDone) {
     content: h(
       'div',
       null,
-      requestSummary(w, 'pidió retirar'),
+      h('div', { class: 'pay-head' }, h('span', { class: 'muted' }, `${w.username} pidió retirar · #${w.id} · ${fmtDate(w.created_at)}`)),
       h('div', { class: 'pay-amount' }, h('span', null, 'Transferí exactamente'), h('strong', null, fmtGs(w.amount)), copyBtn(String(w.amount), 'Copiar monto')),
       bankFields(w),
       h('button', { type: 'button', class: 'btn btn-ghost btn-sm btn-block copy-all', onclick: () => copyText(bankText(w)) }, icon('copy', 15), 'Copiar todos los datos'),
@@ -421,15 +421,20 @@ function requestsView(kind) {
               box.replaceChildren(emptyState(st.q ? 'No hay pendientes de ese usuario' : K.allClear, st.q ? '🔎' : '✅'));
             } else {
               grid = h('div', { class: 'req-grid' }, res.items.map((r) => K.card(r, done)));
-              box.replaceChildren(grid, pager(res, res.total === 1 ? `${K.noun[0]} pendiente` : `${K.noun[1]} pendientes`, (p) => {
-                st.page = p;
-                load();
-              }));
+              box.replaceChildren(
+                grid,
+                res.pages > 1
+                  ? pager(res, res.total === 1 ? `${K.noun[0]} pendiente` : `${K.noun[1]} pendientes`, (p) => {
+                      st.page = p;
+                      load();
+                    })
+                  : '',
+              );
             }
           } else {
             grid = null;
             box.replaceChildren(
-              h('section', { class: 'acard acard-flush' }, dataTable(K.cols(done), res.items, { empty: `No hay ${K.noun[1]} para mostrar`, emptyEmoji: K.emoji })),
+              h('section', { class: 'acard acard-flush' }, dataTable(K.cols(done), res.items, { empty: `No hay ${K.noun[1]} para mostrar`, emptyEmoji: K.emoji, mobileLimit: 15 })),
               pager(res, res.total === 1 ? K.noun[0] : K.noun[1], (p) => {
                 st.page = p;
                 load();

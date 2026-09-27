@@ -59,7 +59,7 @@ class Wallet {
 
   getDeposit(id) {
     return this.db.get(
-      `SELECT d.*, u.username FROM deposits d JOIN users u ON u.id = d.user_id WHERE d.id = ?`,
+      `SELECT d.*, u.username, u.balance AS user_balance FROM deposits d JOIN users u ON u.id = d.user_id WHERE d.id = ?`,
       id,
     );
   }
@@ -173,7 +173,7 @@ class Wallet {
 
   getWithdrawal(id) {
     return this.db.get(
-      `SELECT w.*, u.username FROM withdrawals w JOIN users u ON u.id = w.user_id WHERE w.id = ?`,
+      `SELECT w.*, u.username, u.balance AS user_balance FROM withdrawals w JOIN users u ON u.id = w.user_id WHERE w.id = ?`,
       id,
     );
   }

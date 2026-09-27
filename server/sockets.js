@@ -151,9 +151,10 @@ module.exports = function setupSockets(io, ctx) {
     const u = loadUser(userId);
     if (u) io.to('u:' + userId).emit('me', publicUser(u));
   });
-  bus.on('kick', (userId) => {
-    io.to('u:' + userId).emit('notify', { kind: 'error', title: 'Sesión cerrada', text: 'Tu cuenta fue suspendida.' });
+  bus.on('kick', (userId, reason = 'Tu cuenta fue suspendida.') => {
+    io.to('u:' + userId).emit('notify', { kind: 'error', title: 'Sesión cerrada', text: reason });
     io.in('u:' + userId).disconnectSockets(true);
+    io.of('/admin').in('u:' + userId).disconnectSockets(true);
   });
 
   // Chat y configuración
@@ -193,7 +194,7 @@ module.exports = function setupSockets(io, ctx) {
       inRound.set(b.userId, (inRound.get(b.userId) || 0) + b.amount);
     }
     return list
-      .map((o) => ({
+      .map(({ ua, ...o }) => ({
         ...o,
         balance: byId.get(o.id)?.balance ?? 0,
         role: byId.get(o.id)?.role ?? 'user',
@@ -214,10 +215,17 @@ module.exports = function setupSockets(io, ctx) {
   }
 
   adminNs.on('connection', (socket) => {
+    socket.join('u:' + socket.data.userId);
     socket.emit('stats', liveStats());
   });
 
   const statsTimer = setInterval(() => {
+    if (!adminNs.sockets.size) return;
+    // Si a alguien le quitaron el rol, lo suspendieron o cerró sesión, deja de recibir datos de admin
+    for (const s of adminNs.sockets.values()) {
+      const u = auth.userFromCookieHeader(s.request.headers.cookie);
+      if (!u || u.role !== 'admin' || u.id !== s.data.userId) s.disconnect(true);
+    }
     if (adminNs.sockets.size) adminNs.emit('stats', liveStats());
   }, 1500);
   statsTimer.unref();

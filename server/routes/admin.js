@@ -204,6 +204,7 @@ module.exports = function adminRoutes(ctx) {
   router.post('/users/:id/note', (req, res) => {
     const id = toId(req.params.id);
     const note = cleanText((req.body || {}).note, 500);
+    if (!db.get('SELECT id FROM users WHERE id = ?', id)) throw new AppError('Usuario no encontrado', 404);
     db.run('UPDATE users SET note = ? WHERE id = ?', note || null, id);
     audit(req, 'note', id, { note });
     res.json({ ok: true });
@@ -217,7 +218,7 @@ module.exports = function adminRoutes(ctx) {
     if (!u) throw new AppError('Usuario no encontrado', 404);
     db.run('UPDATE users SET role = ? WHERE id = ?', role, id);
     auth.destroyUserSessions(id); // que vuelva a entrar con el rol nuevo
-    bus.emit('kick', id);
+    bus.emit('kick', id, 'Tus permisos cambiaron. Volvé a ingresar.');
     audit(req, 'role', id, { role }, `${role === 'admin' ? 'hizo administrador a' : 'quitó el rol de admin a'} ${u.username}`);
     res.json({ ok: true, role });
   });

@@ -106,7 +106,7 @@ class Client {
 /** Conecta un socket con la cookie de sesión y junta los eventos recibidos. */
 function connectSocket(base, cookie) {
   const { io } = require('socket.io-client');
-  const socket = io(base, { transports: ['websocket'], extraHeaders: cookie ? { cookie } : {}, reconnection: false });
+  const socket = io(base, { transports: ['websocket'], extraHeaders: cookie ? { cookie } : {}, reconnection: false, forceNew: true });
   const events = [];
   socket.onAny((name, data) => events.push({ name, data, at: Date.now() }));
   const ready = new Promise((resolve, reject) => {

@@ -312,6 +312,31 @@ test('permisos: los jugadores no entran al panel de admin', async () => {
   assert.equal(again.status, 403);
 });
 
+test('un admin al que le quitan el rol deja de recibir los datos del panel en vivo', async () => {
+  const { io } = require('socket.io-client');
+  const p = await newPlayer('ex_admin', 0);
+  await admin.post(`/api/admin/users/${p.id}/role`, { role: 'admin' });
+  const c = new Client(srv.url);
+  assert.equal((await c.post('/api/auth/login', { username: 'ex_admin', password: 'secret1' })).status, 200);
+  const connect = () => io(srv.url + '/admin', { transports: ['websocket'], extraHeaders: { cookie: c.cookie }, reconnection: false, forceNew: true });
+  const s = connect();
+  await new Promise((resolve, reject) => {
+    s.once('stats', resolve);
+    s.once('connect_error', reject);
+  });
+  const gone = new Promise((resolve) => s.once('disconnect', resolve));
+  await admin.post(`/api/admin/users/${p.id}/role`, { role: 'user' });
+  await gone;
+  const s2 = connect();
+  const refused = await new Promise((resolve) => {
+    s2.once('connect_error', () => resolve(true));
+    s2.once('stats', () => resolve(false));
+  });
+  assert.ok(refused, 'ya no puede volver a conectarse al panel');
+  s.close();
+  s2.close();
+});
+
 test('chat: mensajes, límite de velocidad y silenciados', async () => {
   const p = await newPlayer('kari', 0);
   const got = p.s.waitFor('chat', (m) => m.uid === p.id);

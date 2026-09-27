@@ -551,7 +551,18 @@ body.admin::before {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1279.98px) {
+  .top-date,
+  .top-link-text {
+    display: none;
+  }
+
+  .top-link {
+    min-width: 38px;
+  }
 }
 
 .top-links {
@@ -915,6 +926,11 @@ body.admin::before {
   margin: 4px 0 0;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.vhead-text {
+  flex: 1 1 220px;
+  min-width: 0;
 }
 
 .vhead-actions {
@@ -1551,6 +1567,11 @@ body.admin::before {
 
   .rt td.rt-full {
     grid-column: 1 / -1;
+    order: 1;
+  }
+
+  .rt td.is-empty {
+    display: none;
   }
 
   .rt td.hide-sm {
@@ -1568,6 +1589,31 @@ body.admin::before {
 
   .rt tbody tr.clickable:active {
     background: rgba(255, 255, 255, 0.04);
+  }
+
+  .rt-3 tr {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px 10px;
+  }
+
+  .rt-inline-main td.rt-main {
+    grid-column: auto;
+    align-self: center;
+  }
+
+  .rt .round-cancel {
+    flex-wrap: wrap;
+    white-space: normal;
+    gap: 2px 4px;
+  }
+
+  .rt-more {
+    margin: 8px 0 4px;
+  }
+
+  .acard-flush .rt-more {
+    width: calc(100% - 32px);
+    margin: 4px 16px 12px;
   }
 }
 
@@ -1787,6 +1833,14 @@ body.admin::before {
 
 .dash-live .hero-mini {
   min-height: 128px;
+}
+
+.dash-live .mini-stat {
+  padding: 8px 10px;
+}
+
+.dash-live .mini-stat-value {
+  font-size: 0.9rem;
 }
 
 .dash-live .stop-btn {
@@ -2209,6 +2263,7 @@ body.admin::before {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
+  text-shadow: 0 1px 10px rgba(6, 9, 19, 0.95), 0 0 2px rgba(6, 9, 19, 0.9);
 }
 
 .hero-mult {
@@ -2224,6 +2279,7 @@ body.admin::before {
   min-height: 1.3em;
   color: var(--muted);
   font-size: 0.86rem;
+  text-shadow: 0 1px 10px rgba(6, 9, 19, 0.95), 0 0 2px rgba(6, 9, 19, 0.9);
 }
 
 .hero.is-running .hero-mult {
@@ -2374,18 +2430,52 @@ body.admin::before {
   animation: armed 1.6s ease-in-out infinite;
 }
 
-.live-grid {
+.live-top {
   display: grid;
   gap: 14px;
   margin-bottom: 14px;
 }
 
-.live-grid > .acard {
+.live-top > .acard {
   margin: 0;
 }
 
-.live-main .hero {
-  min-height: 300px;
+.live-top .hero {
+  min-height: 310px;
+}
+
+.live-controls {
+  display: flex;
+  flex-direction: column;
+}
+
+.live-controls .acard-head {
+  margin-bottom: 10px;
+}
+
+.live-controls .stop-btn {
+  margin-top: 0;
+  min-height: 76px;
+}
+
+.live-controls .pause-btn {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 10px;
+}
+
+.live-controls .pause-note {
+  padding: 5px 11px;
+  font-size: 0.8rem;
+}
+
+.pause-idle {
+  color: var(--gold);
+  border-color: rgba(255, 197, 61, 0.45);
+}
+
+.pause-idle:hover:not(:disabled) {
+  background: rgba(255, 197, 61, 0.08);
 }
 
 .live-bets .table-wrap {
@@ -2424,21 +2514,26 @@ body.admin::before {
   border-color: rgba(255, 197, 61, 0.45);
 }
 
-@media (min-width: 560px) {
-  .live-main .mini-stats {
+@media (min-width: 560px) and (max-width: 1099.98px) {
+  .live-controls .mini-stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
-@media (min-width: 1180px) {
-  .live-grid {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-    align-items: start;
+@media (min-width: 1100px) {
+  .live-top {
+    grid-template-columns: minmax(0, 1fr) 350px;
+    align-items: stretch;
+  }
+
+  .live-controls .mini-stats {
+    margin-top: auto;
+    padding-top: 12px;
   }
 }
 
 @media (max-width: 560px) {
-  .live-main .hero {
+  .live-top .hero {
     min-height: 240px;
   }
 }
@@ -3037,6 +3132,17 @@ body.drawer-open {
   flex: 1 1 240px;
 }
 
+@media (max-width: 420px) {
+  .req-tabs button {
+    padding: 0.55em 0.45em;
+    font-size: 0.8rem;
+  }
+
+  .req-tabs .seg-badge {
+    margin-left: 4px;
+  }
+}
+
 .req-summary {
   margin: 2px 2px 12px;
   color: var(--muted);
@@ -3304,6 +3410,12 @@ body.drawer-open {
 
 .appr-preview:empty {
   display: none;
+}
+
+.pay-head {
+  margin-bottom: 8px;
+  text-align: center;
+  font-size: 0.84rem;
 }
 
 .pay-amount {
@@ -3971,6 +4083,12 @@ body.drawer-open {
   min-height: 120px;
 }
 
+.fair-box > .acard,
+.log-box > .acard,
+.req-box > .acard {
+  margin-bottom: 14px;
+}
+
 .led-main {
   display: flex;
   align-items: center;
@@ -4019,5 +4137,25 @@ body.drawer-open {
 @media (max-width: 480px) {
   .hide-xs {
     display: none;
+  }
+}
+
+/* Avisos: en escritorio van abajo a la derecha para no tapar la ficha lateral ni la barra superior */
+@media (min-width: 980px) {
+  body.admin .toasts {
+    top: auto;
+    bottom: 20px;
+    left: auto;
+    right: 20px;
+    transform: none;
+    width: min(400px, calc(100vw - 40px));
+  }
+
+  body.admin .toast {
+    transform: translateY(16px);
+  }
+
+  body.admin .toast.show {
+    transform: none;
   }
 }

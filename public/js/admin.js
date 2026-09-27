@@ -29,6 +29,7 @@ let started = false;
 let sockets = null;
 let current = null;
 let authLost = false;
+let adminRetries = 0;
 
 // ───────────────────────── Sonido de avisos ─────────────────────────
 
@@ -223,7 +224,12 @@ async function onAuthLost() {
     /* sin conexión: mostramos el login igual */
   }
   if (user && user.role === 'admin') {
+    // Falsa alarma (por ejemplo el servidor se estaba reiniciando): reintentamos la conexión de admin.
     authLost = false;
+    if (sockets && !sockets.adminSock.connected) {
+      if (adminRetries++ < 5) setTimeout(() => sockets.adminSock.connect(), 2000 * adminRetries);
+      else setConn('down');
+    }
     return;
   }
   if (current) {
@@ -328,7 +334,7 @@ function renderShell() {
       { class: 'side-foot' },
       h('div', { class: 'me' }, avatar(state.me.username, 38), h('div', { class: 'me-text' }, h('div', { class: 'me-name' }, state.me.username), h('div', { class: 'me-role' }, '👑 Administrador'))),
       sideLink('🎮', 'Ir al juego', { href: '/' }),
-      sideLink('🔐', 'Provably fair', { href: '/fair', target: '_blank', rel: 'noopener' }),
+      sideLink('🔐', 'Verificación pública', { href: '/fair', target: '_blank', rel: 'noopener' }),
       sideLink('🔑', 'Cambiar contraseña', { onclick: changeOwnPassword }),
       ui.soundBtn,
       sideLink('🚪', 'Cerrar sesión', { onclick: logout, class: 'side-link side-link-danger' }),
@@ -354,8 +360,13 @@ function renderShell() {
       h(
         'div',
         { class: 'top-links' },
-        h('a', { class: 'btn btn-ghost btn-sm', href: '/' }, '🎮 Ir al juego'),
-        h('a', { class: 'btn btn-ghost btn-sm', href: '/fair', target: '_blank', rel: 'noopener' }, '🔐 Provably fair'),
+        h('a', { class: 'btn btn-ghost btn-sm top-link', href: '/', title: 'Ir al juego' }, h('span', { 'aria-hidden': 'true' }, '🎮'), h('span', { class: 'top-link-text' }, 'Ir al juego')),
+        h(
+          'a',
+          { class: 'btn btn-ghost btn-sm top-link', href: '/fair', target: '_blank', rel: 'noopener', title: 'Provably fair (página pública)' },
+          h('span', { 'aria-hidden': 'true' }, '🔐'),
+          h('span', { class: 'top-link-text' }, 'Provably fair'),
+        ),
       ),
     ),
   );
@@ -517,6 +528,9 @@ function connect() {
       if (reason === 'io server disconnect' && !authLost) setTimeout(() => s.connect(), 1500);
     });
   }
+  adminSock.on('connect', () => {
+    adminRetries = 0;
+  });
   adminSock.on('connect_error', (err) => {
     if (/autorizado/i.test(err && err.message)) onAuthLost();
     else refresh();

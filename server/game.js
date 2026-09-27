@@ -610,7 +610,10 @@ class GameEngine extends EventEmitter {
       growth: r ? r.growth : BASE_GROWTH,
       elapsed: this.phase === 'RUNNING' ? now - r.startedAt : null,
       bettingLeft: this.phase === 'BETTING' ? Math.max(0, r.bettingEndsAt - now) : null,
-      last: this.phase === 'CRASHED' ? this.lastCrash : null,
+      last:
+        this.phase === 'CRASHED' && this.lastCrash
+          ? { ...this.lastCrash, nextIn: Math.max(0, (r.endedAt || now) + this.lastCrash.nextIn - now) }
+          : null,
       totals: { bet: totalBet, payout: totalPayout, active: activeAmount, players: players.size, count: bets.length },
       bets,
     };

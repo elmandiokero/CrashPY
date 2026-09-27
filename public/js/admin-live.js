@@ -81,18 +81,21 @@ function applyState(g, fromAdmin) {
     const end = now + g.bettingLeft;
     if (roundChanged || phaseChanged || end < game.bettingEnd) game.bettingEnd = end;
   } else if (g.phase === 'CRASHED' && g.last) {
-    if (phaseChanged || roundChanged || !game.last) {
-      game.last = g.last;
-      // El estado público trae el tiempo restante; el del admin no, así que no se inventa.
-      game.nextAt = fromAdmin ? 0 : now + (g.last.nextIn || 0);
-    }
+    if (phaseChanged || roundChanged || !game.last) game.last = g.last;
+    // El estado público trae el tiempo que falta para la próxima ronda; el del admin no, así que no se inventa.
+    if (!fromAdmin && Number.isFinite(g.last.nextIn)) game.nextAt = now + g.last.nextIn;
+    else if (phaseChanged || roundChanged) game.nextAt = 0;
   }
   if (g.phase !== 'CRASHED' && phaseChanged) game.last = null;
   game.phase = g.phase;
   if (roundChanged) game.refunded.clear();
   if (Array.isArray(g.bets)) {
     const next = new Map();
-    for (const b of g.bets) next.set(b.id, fromAdmin ? b : { ...game.bets.get(b.id), ...b });
+    for (const b of g.bets) {
+      // El estado público incluye las apuestas devueltas; las guardamos aparte como hace el servidor.
+      if (b.status === 'refunded') game.refunded.set(b.id, { ...game.bets.get(b.id), ...b });
+      else next.set(b.id, fromAdmin ? b : { ...game.bets.get(b.id), ...b });
+    }
     for (const id of game.refunded.keys()) next.delete(id);
     game.bets = next;
   }
@@ -367,8 +370,9 @@ export async function togglePause() {
       const r = await post('/api/admin/game/pause');
       toast(r.phase === 'PAUSED' ? 'Juego pausado' : 'El juego se pausará al terminar esta ronda', 'info', '⏸ Pausa');
     } else {
+      const wasStopped = game.phase === 'PAUSED';
       await post('/api/admin/game/resume');
-      toast(game.phase === 'PAUSED' ? 'El juego vuelve a arrancar' : 'Se canceló la pausa', 'success', '▶ Reanudado');
+      toast(wasStopped ? 'El juego vuelve a arrancar' : 'Se canceló la pausa', 'success', '▶ Reanudado');
     }
   } catch (err) {
     notifyError(err);
@@ -385,7 +389,7 @@ export function pauseButton() {
   const update = () => {
     const s = pauseState();
     if (s === 'running') {
-      btn.className = 'btn btn-warn pause-btn';
+      btn.className = 'btn btn-ghost pause-btn pause-idle';
       btn.replaceChildren(icon('pause', 17), 'Pausar juego');
     } else if (s === 'paused') {
       btn.className = 'btn btn-primary pause-btn';
@@ -451,7 +455,7 @@ function drawCurve(canvas, now) {
   ctx.font = '600 11px Rubik, system-ui, sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
-  for (const gm of guideSteps(mMax)) {
+  for (const gm of elapsed === null ? [] : guideSteps(mMax)) {
     const y = Math.round(Y(gm)) + 0.5;
     ctx.beginPath();
     ctx.moveTo(padL, y);
@@ -539,7 +543,7 @@ export function roundHero({ mini = false } = {}) {
       chip.className = `chip ${r.chip[1]}`;
       chip.textContent = r.chip[0];
     }
-    setText(round, game.roundId ? `Ronda #${fmtNum(game.roundId)}` : '');
+    setText(round, game.roundId ? `Ronda #${game.roundId}` : '');
     pausedChip.hidden = !(game.paused && game.phase !== 'PAUSED');
     setText(kicker, r.kicker);
     setText(big, r.big);
@@ -592,20 +596,27 @@ function betRow(b) {
   return tr;
 }
 
+/**
+ * Tope de ganancia: los topes altísimos se muestran sin decimales ("1001x").
+ * Sin separador de miles a propósito: "1.001x" se confundiría con 1,001x.
+ */
+const fmtCap = (c) => (c >= 100000 ? `${Math.floor(c / 100)}x` : fmtMult(c));
+
 function updateBetRow(tr, b) {
   const c = tr._c;
   setText(c.amount, fmtGs(b.amount));
   setText(c.auto, b.auto ? fmtMult(b.auto) : '—');
-  setText(c.cap, b.cap ? fmtMult(b.cap) : '—');
+  setText(c.cap, b.cap ? fmtCap(b.cap) : '—');
   if (tr._status !== b.status) {
     tr._status = b.status;
     c.status.replaceChildren(betChip(b.status));
     tr.className = `bet-row bet-${b.status}`;
   }
   setText(c.cashout, b.cashout ? fmtMult(b.cashout) : '—');
-  c.cashout.className = `num ${b.cashout ? multClass(b.cashout) : 'faint'}`;
+  c.cashout.className = `num ${b.cashout ? multClass(b.cashout) : 'faint is-empty'}`;
   setText(c.payout, b.payout ? fmtGs(b.payout) : '—');
-  c.payout.className = `num ${b.payout ? 'green' : 'faint'}`;
+  c.payout.className = `num ${b.payout ? 'green' : 'faint is-empty'}`;
+  c.auto.classList.toggle('is-empty', !b.auto);
 }
 
 function sortedBets() {
@@ -621,7 +632,7 @@ export function betsTable() {
     { class: 'table-wrap rt-wrap' },
     h(
       'table',
-      { class: 'table rt bets-table' },
+      { class: 'table rt rt-3 bets-table' },
       h(
         'thead',
         null,
@@ -698,11 +709,11 @@ function crashCell(r) {
 }
 
 const ROUND_COLS = [
-  { label: 'Ronda', main: true, render: (r) => h('span', { class: 'round-id' }, `#${fmtNum(r.id)}`) },
+  { label: 'Ronda', main: true, render: (r) => h('span', { class: 'round-id' }, `#${r.id}`) },
   { label: 'Explotó en', render: crashCell },
   { label: 'Jugadores', cls: 'num', render: (r) => fmtNum(r.players) },
   { label: 'Apostado', cls: 'num', render: (r) => fmtGs(r.total_bet) },
-  { label: 'Pagado', cls: 'num', render: (r) => fmtGs(r.total_payout) },
+  { label: 'Pagado', cls: 'num', hideSm: true, render: (r) => fmtGs(r.total_payout) },
   { label: 'Devuelto', cls: 'num', hideSm: true, render: (r) => (r.total_refund ? fmtGs(r.total_refund) : null) },
   { label: 'Ganancia casa', cls: 'num', render: (r) => signedMoney(r.total_bet - r.total_payout) },
   { label: 'Hora', cls: 'num', render: (r) => h('span', { title: fmtDate(r.ended_at) }, fmtTime(r.ended_at)) },
@@ -734,6 +745,9 @@ export const liveView = {
             empty: 'Todavía no terminó ninguna ronda',
             emptyEmoji: '🚀',
             rowClass: (r) => (r.status === 'cancelled' ? 'row-cancelled' : ''),
+            compact: true,
+            inlineMain: true,
+            mobileLimit: 12,
           }),
           pager(res, 'rondas', (p) => {
             roundsPage = p;
@@ -755,20 +769,23 @@ export const liveView = {
     const updatePauseNote = () => {
       const s = pauseState();
       pauseNote.className = `pause-note pn-${s}`;
-      pauseNote.textContent =
-        s === 'paused' ? '⏸ El juego está pausado' : s === 'pausing' ? '⏳ Se pausará al terminar la ronda' : '🟢 El juego está corriendo';
+      pauseNote.textContent = s === 'paused' ? '⏸️ Pausado' : s === 'pausing' ? '⏳ Se pausa al terminar' : '🟢 Juego activo';
     };
     updatePauseNote();
     sc.on('game:state', updatePauseNote);
 
+    const controls = h(
+      'section',
+      { class: 'acard live-controls' },
+      h('div', { class: 'acard-head' }, h('h2', { class: 'acard-title' }, icon('zap', 18), h('span', null, 'Controles')), pauseNote),
+      stop.el,
+      pause.el,
+      tot.el,
+    );
     el.append(
-      viewHead('Ronda en vivo', 'Seguí cada ronda en tiempo real y controlá el juego.', pauseNote, pause.el),
-      h(
-        'div',
-        { class: 'live-grid' },
-        h('div', { class: 'live-main' }, h('section', { class: 'acard hero-card' }, hero.el), stop.el, tot.el),
-        card('Apuestas de la ronda', { cls: 'live-bets', icon: 'users', actions: bets.count }, bets.el),
-      ),
+      viewHead('Ronda en vivo', 'Seguí cada ronda en tiempo real y controlá el juego.'),
+      h('div', { class: 'live-top' }, h('section', { class: 'acard hero-card' }, hero.el), controls),
+      card('Apuestas de la ronda', { cls: 'live-bets', icon: 'users', actions: bets.count }, bets.el),
       card('Rondas recientes', { icon: 'clock', actions: refreshBtn(loadRounds) }, roundsBody),
     );
     loadRounds();

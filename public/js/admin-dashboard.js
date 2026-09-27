@@ -421,11 +421,16 @@ export const dashboardView = {
     const online = onlineCard();
     const activity = activityCard();
 
+    let globKey = '';
     const renderGlobal = () => {
       const d = this.data;
       const s = d ? d.stats : null;
       const pend = state.pending;
       const onlineN = (state.online || []).length;
+      // Solo se redibuja si algo cambió (llega un "stats" cada 1,5 s).
+      const key = JSON.stringify([s && s.users, s && s.adjustments, pend, onlineN, state.connections]);
+      if (key === globKey) return;
+      globKey = key;
       glob.replaceChildren(
         tile({
           label: 'Usuarios registrados',
@@ -472,9 +477,13 @@ export const dashboardView = {
       );
     };
 
+    let statsKey = '';
     const renderStats = () => {
       const d = this.data;
       if (!d) return;
+      const key = JSON.stringify([period, d.stats[period], d.charts, new Date().getHours()]);
+      if (key === statsKey) return;
+      statsKey = key;
       const p = d.stats[period];
       heroValue.className = `dhero-value ${signClass(p.profit)}`;
       heroValue.textContent = fmtSigned(p.profit);

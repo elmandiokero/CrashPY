@@ -24,7 +24,7 @@ const LEDGER_COLS = [
   { label: 'Movimiento', main: true, render: (l) => h('div', { class: 'led-main' }, ledgerChip(l.type), userLink(l.user_id, l.username)) },
   { label: 'Monto', cls: 'num', render: (l) => signedMoney(l.amount) },
   { label: 'Saldo después', cls: 'num', render: (l) => fmtGs(l.balance_after) },
-  { label: 'Nota', cls: 'wrap-cell', render: (l) => l.note },
+  { label: 'Nota', cls: 'wrap-cell', full: true, render: (l) => l.note },
   { label: 'Admin', render: (l) => (l.admin ? h('span', { class: 'chip chip-gold' }, l.admin) : null) },
   { label: 'Fecha', cls: 'num', render: (l) => fmtDate(l.created_at) },
 ];
@@ -48,7 +48,7 @@ export const ledgerView = {
         const res = await call(`/api/admin/ledger?${qs}`);
         if (seq !== this.seq) return;
         box.replaceChildren(
-          h('section', { class: 'acard acard-flush' }, dataTable(LEDGER_COLS, res.items, { empty: 'No hay movimientos con ese filtro', emptyEmoji: '📒' })),
+          h('section', { class: 'acard acard-flush' }, dataTable(LEDGER_COLS, res.items, { empty: 'No hay movimientos con ese filtro', emptyEmoji: '📒', compact: true, mobileLimit: 20 })),
           pager(res, res.total === 1 ? 'movimiento' : 'movimientos', (p) => {
             lq.page = p;
             load();
@@ -107,6 +107,7 @@ const ACTIONS = {
   chat_clear: ['🧹', 'Chat limpiado'],
   chat_delete: ['🗑️', 'Mensaje borrado'],
   backup: ['💾', 'Respaldo creado'],
+  own_password: ['🔑', 'Cambió su propia contraseña'],
 };
 
 const yesNo = (v) => (v ? 'Sí' : 'No');
@@ -126,7 +127,7 @@ const DETAIL_KEYS = {
   mode: ['Modo', (v) => (v === 'pay' ? 'Pagar a todos' : v === 'refund' ? 'Devolver apuestas' : v)],
   multiplier: ['Cortada en', fmtMult],
   affected: ['Apuestas afectadas', fmtNum],
-  roundId: ['Ronda', (v) => `#${fmtNum(v)}`],
+  roundId: ['Ronda', (v) => `#${v}`],
   houseEdgeBps: ['Ventaja', (v) => fmtPct(v / 100, 2)],
   text: ['Texto', text],
   user: ['Usuario', text],
@@ -174,7 +175,7 @@ function auditDetails(a) {
     } else if (DETAIL_KEYS[k]) {
       const [l, fn] = DETAIL_KEYS[k];
       label = l;
-      value = v === '' ? '(vacío)' : fn(v);
+      value = v === '' ? (k === 'note' && /reject/.test(a.action) ? 'el de siempre' : '(vacío)') : fn(v);
     } else {
       label = k;
       value = typeof v === 'object' ? JSON.stringify(v) : String(v);
@@ -213,7 +214,7 @@ export const auditView = {
         const [res] = await Promise.all([call(`/api/admin/audit?page=${auditPage}`), loadSettingsLabels()]);
         if (seq !== this.seq) return;
         box.replaceChildren(
-          h('section', { class: 'acard acard-flush' }, dataTable(AUDIT_COLS, res.items, { empty: 'Todavía no hay acciones registradas', emptyEmoji: '🛡️' })),
+          h('section', { class: 'acard acard-flush' }, dataTable(AUDIT_COLS, res.items, { empty: 'Todavía no hay acciones registradas', emptyEmoji: '🛡️', compact: true, mobileLimit: 15 })),
           pager(res, res.total === 1 ? 'acción' : 'acciones', (p) => {
             auditPage = p;
             load();

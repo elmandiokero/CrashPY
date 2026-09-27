@@ -539,7 +539,11 @@ export function pager(res, label, onPage) {
  * Tabla que en el celular se convierte en tarjetas.
  * cols: [{ label, key, render(row), cls, main, hideSm, sort }]
  */
-export function dataTable(cols, rows, { onRow, empty = 'No hay datos para mostrar', emptyEmoji, rowClass, sort } = {}) {
+export function dataTable(
+  cols,
+  rows,
+  { onRow, empty = 'No hay datos para mostrar', emptyEmoji, rowClass, sort, compact = false, inlineMain = false, mobileLimit = 0 } = {},
+) {
   if (!rows || !rows.length) return emptyState(empty, emptyEmoji);
   const head = h(
     'tr',
@@ -562,19 +566,20 @@ export function dataTable(cols, rows, { onRow, empty = 'No hay datos para mostra
       return h('th', { class: cls }, c.label);
     }),
   );
-  const body = rows.map((row) => {
+  const renderRow = (row) => {
     const tr = h(
       'tr',
       { class: [onRow ? 'clickable' : '', rowClass ? rowClass(row) : ''].filter(Boolean).join(' ') || null },
       cols.map((c) => {
         const value = c.render ? c.render(row) : row[c.key];
+        const empty = value === null || value === undefined || value === '';
         return h(
           'td',
           {
-            class: [c.cls, c.main ? 'rt-main' : '', c.hideSm ? 'hide-sm' : '', c.full ? 'rt-full' : ''].filter(Boolean).join(' ') || null,
+            class: [c.cls, c.main ? 'rt-main' : '', c.hideSm ? 'hide-sm' : '', c.full ? 'rt-full' : '', empty ? 'is-empty' : ''].filter(Boolean).join(' ') || null,
             'data-label': c.main ? null : c.label,
           },
-          value === null || value === undefined || value === '' ? h('span', { class: 'faint' }, '—') : value,
+          empty ? h('span', { class: 'faint' }, '—') : value,
         );
       }),
     );
@@ -589,8 +594,23 @@ export function dataTable(cols, rows, { onRow, empty = 'No hay datos para mostra
       });
     }
     return tr;
-  });
-  return h('div', { class: 'table-wrap rt-wrap' }, h('table', { class: 'table rt' }, h('thead', null, head), h('tbody', null, body)));
+  };
+  // En el celular las tablas largas muestran primero unas pocas filas (se ven como tarjetas).
+  const narrow = mobileLimit > 0 && window.matchMedia('(max-width: 720px)').matches;
+  let shown = narrow ? Math.min(rows.length, mobileLimit) : rows.length;
+  const tbody = h('tbody', null, rows.slice(0, shown).map(renderRow));
+  const cls = ['table', 'rt', compact ? 'rt-3' : '', inlineMain ? 'rt-inline-main' : ''].filter(Boolean).join(' ');
+  const wrap = h('div', { class: 'table-wrap rt-wrap' }, h('table', { class: cls }, h('thead', null, head), tbody));
+  if (shown < rows.length) {
+    const more = h('button', { type: 'button', class: 'btn btn-ghost btn-sm btn-block rt-more' }, icon('chevDown', 16), `Ver ${rows.length - shown} más`);
+    more.addEventListener('click', () => {
+      tbody.append(...rows.slice(shown).map(renderRow));
+      shown = rows.length;
+      more.remove();
+    });
+    wrap.append(more);
+  }
+  return wrap;
 }
 
 /**

@@ -77,17 +77,26 @@ export const chatView = {
     const count = h('span', { class: 'acard-sub' });
 
     const nearBottom = () => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < NEAR_BOTTOM;
+    let stick = true; // seguir el final del chat hasta que el admin suba a leer
     const toBottom = () => {
+      stick = true;
       scroller.scrollTop = scroller.scrollHeight;
       jump.hidden = true;
     };
+    // Si el contenido crece (fuentes/emojis que cargan tarde, mensajes nuevos) seguimos abajo.
+    const ro = new ResizeObserver(() => {
+      if (stick) scroller.scrollTop = scroller.scrollHeight;
+    });
+    ro.observe(list);
+    sc.add(() => ro.disconnect());
     const updateCount = () => {
       const n = list.children.length;
       count.textContent = n ? `${n} ${n === 1 ? 'mensaje' : 'mensajes'}` : '';
       empty.hidden = n > 0;
     };
     scroller.addEventListener('scroll', () => {
-      if (nearBottom()) jump.hidden = true;
+      stick = nearBottom();
+      if (stick) jump.hidden = true;
     });
     jump.addEventListener('click', toBottom);
 
@@ -107,7 +116,6 @@ export const chatView = {
 
     sc.on('chat', (m) => {
       if (!list.isConnected || list.querySelector(`[data-id="${Number(m.id)}"]`)) return;
-      const stick = nearBottom();
       const node = msgEl(m);
       node.classList.add('is-new');
       list.append(node);
