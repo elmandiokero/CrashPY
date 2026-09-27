@@ -160,6 +160,7 @@ class BotManager extends EventEmitter {
     this.lastChat = 0;
     this.pending = new Map();
     this.doubleStreak = { color: null, n: 0 };
+    this.recentPhrases = []; // para no repetir la misma frase seguido
   }
 
   // ───────────────────────── Arranque y configuración ─────────────────────────
@@ -215,7 +216,7 @@ class BotManager extends EventEmitter {
     }
     this.emit('online', this.roster.length);
     // Uno de los que llegan saluda
-    if (joined.length) setTimeout(() => this._say(pick(joined), pick(CHAT.hello)), between(1500, 5000));
+    if (joined.length) setTimeout(() => this._say(pick(joined), this._phrase(CHAT.hello)), between(1500, 5000));
   }
 
   _clearTimers(slot) {
@@ -322,7 +323,7 @@ class BotManager extends EventEmitter {
     bet.cashout = bet.target;
     bet.payout = Math.floor((bet.amount * bet.target) / 100);
     this.emit('crash:cashout', { id: bet.id, uid: bet.uid, user: bet.user, slot: bet.slot, amount: bet.amount, cashout: bet.cashout, payout: bet.payout, bot: true });
-    if (bet.target >= 1000 && chance(0.35)) setTimeout(() => this._say(bet.who, fill(pick(CHAT.myCashout), { m: fmtMult(bet.target) })), between(800, 2500));
+    if (bet.target >= 1000 && chance(0.35)) setTimeout(() => this._say(bet.who, fill(this._phrase(CHAT.myCashout), { m: fmtMult(bet.target) })), between(800, 2500));
   }
 
   _crashEnd(d) {
@@ -340,8 +341,8 @@ class BotManager extends EventEmitter {
     }
     this._record('crash', plays, bet, payout);
     if (!d.cancelled && this.enabled) {
-      if (d.crash <= 110 && chance(0.3)) setTimeout(() => this._say(pick(this.roster), pick(CHAT.crashLow)), between(700, 2200));
-      else if (d.crash >= 1000 && chance(0.45)) setTimeout(() => this._say(pick(this.roster), fill(pick(CHAT.crashHigh), { m: fmtMult(d.crash) })), between(700, 2200));
+      if (d.crash <= 110 && chance(0.3)) setTimeout(() => this._say(pick(this.roster), this._phrase(CHAT.crashLow)), between(700, 2200));
+      else if (d.crash >= 1000 && chance(0.45)) setTimeout(() => this._say(pick(this.roster), fill(this._phrase(CHAT.crashHigh), { m: fmtMult(d.crash) })), between(700, 2200));
     }
   }
 
@@ -422,10 +423,10 @@ class BotManager extends EventEmitter {
     if (this.doubleStreak.color === color) this.doubleStreak.n++;
     else this.doubleStreak = { color, n: 1 };
     if (!this.enabled) return;
-    if (color === 'white' && chance(0.55)) setTimeout(() => this._say(pick(this.roster), pick(CHAT.white)), between(900, 2500));
+    if (color === 'white' && chance(0.55)) setTimeout(() => this._say(pick(this.roster), this._phrase(CHAT.white)), between(900, 2500));
     else if (color !== 'white' && this.doubleStreak.n >= 4 && chance(0.3)) {
       const names = { red: 'rojos', black: 'negros' };
-      setTimeout(() => this._say(pick(this.roster), fill(pick(CHAT.streak), { n: this.doubleStreak.n, c: names[color] })), between(900, 2500));
+      setTimeout(() => this._say(pick(this.roster), fill(this._phrase(CHAT.streak), { n: this.doubleStreak.n, c: names[color] })), between(900, 2500));
     }
   }
 
@@ -501,9 +502,9 @@ class BotManager extends EventEmitter {
     if (!this.enabled) return;
     if (pleno && chance(0.5)) {
       const bot = this.roster.find((x) => x.uid === pleno.uid);
-      setTimeout(() => this._say(bot, fill(pick(CHAT.pleno), { n: result })), between(1200, 3000));
+      setTimeout(() => this._say(bot, fill(this._phrase(CHAT.pleno), { n: result })), between(1200, 3000));
     } else if (result === 0 && chance(0.35)) {
-      setTimeout(() => this._say(pick(this.roster), pick(CHAT.zero)), between(1200, 3000));
+      setTimeout(() => this._say(pick(this.roster), this._phrase(CHAT.zero)), between(1200, 3000));
     }
   }
 
@@ -579,7 +580,7 @@ class BotManager extends EventEmitter {
     }
     this.bus.emit('feed', { game, user: bot.name, amount, multiplier, payout, ts: Date.now(), bot: true });
     this._record(game, 1, amount, payout);
-    if (multiplier >= 1000 && chance(0.35)) setTimeout(() => this._say(bot, fill(pick(CHAT.soloWin[game]), { m: fmtMult(multiplier) })), between(1200, 3000));
+    if (multiplier >= 1000 && chance(0.35)) setTimeout(() => this._say(bot, fill(this._phrase(CHAT.soloWin[game]), { m: fmtMult(multiplier) })), between(1200, 3000));
   }
 
   // ───────────────────────── 💬 Chat ─────────────────────────
@@ -587,16 +588,25 @@ class BotManager extends EventEmitter {
   _scheduleChat() {
     clearTimeout(this.chatTimer);
     const n = this.enabled ? this.roster.length : 0;
-    const delay = n ? between(20000, 50000) * Math.sqrt(12 / Math.max(3, n)) : 8000;
+    const delay = n ? between(30000, 75000) * Math.sqrt(12 / Math.max(3, n)) : 8000;
     this.chatTimer = setTimeout(() => {
-      if (this.enabled) this._say(pick(this.roster), pick(CHAT.generic));
+      if (this.enabled) this._say(pick(this.roster), this._phrase(CHAT.generic));
       this._scheduleChat();
     }, delay);
     this.chatTimer.unref();
   }
 
+  /** Una frase al azar que no se haya dicho hace poco (así el chat no se repite). */
+  _phrase(list) {
+    const fresh = list.filter((t) => !this.recentPhrases.includes(t));
+    const text = pick(fresh.length ? fresh : list);
+    this.recentPhrases.push(text);
+    if (this.recentPhrases.length > 14) this.recentPhrases.shift();
+    return text;
+  }
+
   _canChat() {
-    return this.enabled && !!this.settings.get('bots_chat') && !!this.settings.get('chat_enabled') && Date.now() - this.lastChat > 6000;
+    return this.enabled && !!this.settings.get('bots_chat') && !!this.settings.get('chat_enabled') && Date.now() - this.lastChat > 9000;
   }
 
   _say(bot, text) {
@@ -608,7 +618,7 @@ class BotManager extends EventEmitter {
   /** De vez en cuando un bot felicita a un jugador real que ganó mucho. */
   _cheer(w) {
     if (!this.enabled || !w.user || chance(0.8)) return;
-    setTimeout(() => this._say(pick(this.roster), fill(pick(CHAT.cheer), { u: w.user })), between(1500, 4000));
+    setTimeout(() => this._say(pick(this.roster), fill(this._phrase(CHAT.cheer), { u: w.user })), between(1500, 4000));
   }
 
   // ───────────────────────── Informe para el admin ─────────────────────────

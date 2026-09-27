@@ -1,0 +1,649 @@
+/* ═══════════════ ⚽ Penales de la Albirroja ═══════════════ */
+
+.pn-stage {
+  width: 100%;
+  aspect-ratio: 1.08 / 1;
+  min-height: 300px;
+  max-height: 460px;
+  /* celular acostado: que el arco entre en la pantalla */
+  min-height: min(300px, calc(100svh - 96px));
+  max-height: min(460px, calc(100svh - 96px));
+  align-self: start;
+  background: linear-gradient(180deg, #060a1e 0%, #121838 40%, #0e5a2c 60%, #117a3b 100%);
+  background-origin: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pn-bg,
+.pn-fg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* El fondo (tribunas con miles de puntitos) se pinta una sola vez en su propia capa */
+.pn-bg {
+  z-index: 0;
+  will-change: transform;
+}
+
+.pn-fg {
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  font-family: var(--font);
+}
+
+/* Hinchada que salta con el gol */
+.pn-crowd.pn-cheer {
+  animation: pnCheer 1.2s ease-out;
+}
+
+@keyframes pnCheer {
+  15% {
+    transform: translateY(-2.4px);
+  }
+  30% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(-2px);
+  }
+  60% {
+    transform: translateY(0);
+  }
+  75% {
+    transform: translateY(-1.2px);
+  }
+}
+
+/* Banderas albirrojas flameando */
+.pn-flag {
+  transform-box: fill-box;
+  transform-origin: 0% 50%;
+  animation: pnWave 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes pnWave {
+  from {
+    transform: skewY(-7deg) scaleX(0.9);
+  }
+  to {
+    transform: skewY(6deg) scaleX(1);
+  }
+}
+
+/* Arquero: brazos según la pose y balanceo mientras espera */
+.pn-arms-dive,
+.pn-arms-jump,
+.pn-keeper[data-pose='dive'] .pn-arms-ready,
+.pn-keeper[data-pose='jump'] .pn-arms-ready {
+  display: none;
+}
+
+.pn-keeper[data-pose='dive'] .pn-arms-dive,
+.pn-keeper[data-pose='jump'] .pn-arms-jump {
+  display: inline;
+}
+
+.pn-keeper[data-pose='ready'] .pn-sway {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: pnSway 2.6s ease-in-out infinite alternate;
+}
+
+@keyframes pnSway {
+  from {
+    transform: translateX(-2.6px) rotate(-1.6deg);
+  }
+  to {
+    transform: translateX(2.6px) rotate(1.6deg);
+  }
+}
+
+/* ───────── Zonas para patear (izquierda / centro / derecha) ───────── */
+.pn-zhit {
+  pointer-events: all;
+}
+
+.pn-zone {
+  outline: none;
+}
+
+.pn-can-kick .pn-zone {
+  cursor: pointer;
+}
+
+.pn-zfill {
+  fill: rgba(255, 255, 255, 0);
+  stroke: rgba(255, 255, 255, 0);
+  stroke-width: 1.2;
+  stroke-dasharray: 5 4;
+  transition: fill 0.15s, stroke 0.15s;
+}
+
+.pn-cross {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  transform: scale(0.6);
+  transition: opacity 0.18s, transform 0.22s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.pn-cross-glow {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 5;
+}
+
+.pn-cross-ring {
+  fill: rgba(255, 255, 255, 0.08);
+  stroke: #ffffff;
+  stroke-width: 1.6;
+}
+
+.pn-cross-tick {
+  stroke: #ffffff;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.pn-cross-dot {
+  fill: #ffffff;
+}
+
+/* Mientras se puede patear, las miras laten suave para mostrar dónde tocar */
+.pn-can-kick .pn-cross {
+  animation: pnCrossHint 1.8s ease-in-out infinite;
+}
+
+.pn-can-kick .pn-zone:nth-child(2) .pn-cross {
+  animation-delay: 0.3s;
+}
+
+.pn-can-kick .pn-zone:nth-child(3) .pn-cross {
+  animation-delay: 0.6s;
+}
+
+@keyframes pnCrossHint {
+  0%,
+  100% {
+    opacity: 0.18;
+    transform: scale(0.72);
+  }
+  50% {
+    opacity: 0.42;
+    transform: scale(0.8);
+  }
+}
+
+@media (hover: hover) {
+  .pn-can-kick .pn-zone:hover .pn-zfill {
+    fill: rgba(255, 255, 255, 0.1);
+    stroke: rgba(255, 255, 255, 0.45);
+  }
+
+  .pn-can-kick .pn-zone:hover .pn-cross {
+    animation: none;
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pn-can-kick .pn-zone.pn-press .pn-zfill {
+  fill: rgba(255, 255, 255, 0.16);
+  stroke: rgba(255, 255, 255, 0.55);
+}
+
+.pn-can-kick .pn-zone.pn-press .pn-cross,
+.pn-can-kick .pn-zone:focus-visible .pn-cross {
+  animation: none;
+  opacity: 1;
+  transform: scale(1);
+}
+
+.pn-zone:focus-visible .pn-zfill {
+  stroke: #7fa8ff;
+  stroke-width: 1.8;
+}
+
+/* Zona elegida: mira dorada */
+.pn-zone.pn-aim .pn-zfill {
+  fill: rgba(255, 197, 61, 0.12);
+  stroke: rgba(255, 197, 61, 0.75);
+}
+
+.pn-zone.pn-aim .pn-cross {
+  opacity: 1;
+  transform: scale(1);
+  animation: pnAim 0.5s ease-in-out infinite alternate;
+}
+
+.pn-zone.pn-aim .pn-cross-ring,
+.pn-zone.pn-aim .pn-cross-tick {
+  stroke: #ffc53d;
+}
+
+.pn-zone.pn-aim .pn-cross-glow {
+  stroke: rgba(255, 197, 61, 0.45);
+}
+
+.pn-zone.pn-aim .pn-cross-dot {
+  fill: #ffc53d;
+}
+
+@keyframes pnAim {
+  from {
+    transform: scale(0.92);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+/* ───────── Capas sobre la escena ───────── */
+.pn-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(2, 4, 14, 0.55) 100%),
+    linear-gradient(180deg, rgba(2, 4, 14, 0.35), transparent 18%);
+}
+
+.pn-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.pn-flash.pn-flash-goal {
+  background: radial-gradient(55% 42% at 50% 36%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 72%);
+  animation: pnFlash 0.75s ease-out forwards;
+}
+
+.pn-flash.pn-flash-save {
+  background: radial-gradient(95% 85% at 50% 50%, rgba(255, 40, 60, 0) 45%, rgba(255, 40, 60, 0.5) 100%);
+  animation: pnFlash 0.9s ease-out forwards;
+}
+
+@keyframes pnFlash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.pn-stage.pn-shake {
+  animation: pnShake 0.45s ease;
+}
+
+@keyframes pnShake {
+  15% {
+    transform: translate(-5px, 2px);
+  }
+  30% {
+    transform: translate(5px, -2px);
+  }
+  50% {
+    transform: translate(-3px, 1px);
+  }
+  70% {
+    transform: translate(3px, 0);
+  }
+  85% {
+    transform: translate(-1px, 0);
+  }
+}
+
+/* Marcador: los 5 penales y el premio actual */
+.pn-hud {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 4;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.pn-kicks {
+  display: flex;
+  gap: 5px;
+  padding: 5px 6px;
+  border-radius: 999px;
+  background: rgba(5, 8, 22, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.pn-kick {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #8d95bd;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  font-variant-numeric: tabular-nums;
+  transition: background 0.25s, border-color 0.25s, color 0.25s, box-shadow 0.25s;
+}
+
+.pn-kick.pn-is-next {
+  color: #fff;
+  border-color: rgba(255, 197, 61, 0.95);
+  box-shadow: 0 0 10px rgba(255, 197, 61, 0.55);
+  animation: pnNext 1.2s ease-in-out infinite;
+}
+
+@keyframes pnNext {
+  50% {
+    box-shadow: 0 0 2px rgba(255, 197, 61, 0.2);
+  }
+}
+
+.pn-kick.pn-is-goal {
+  font-size: 0.86rem;
+  background: rgba(43, 217, 107, 0.24);
+  border-color: rgba(95, 242, 154, 0.9);
+  box-shadow: 0 0 10px rgba(43, 217, 107, 0.4);
+  animation: pnPop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.pn-kick.pn-is-saved {
+  font-size: 0.8rem;
+  background: rgba(255, 59, 78, 0.28);
+  border-color: rgba(255, 107, 121, 0.95);
+  box-shadow: 0 0 10px rgba(255, 59, 78, 0.45);
+  animation: pnPop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.pn-kick.pn-is-ghost {
+  color: #c3cae8;
+  font-size: 0.78rem;
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+@keyframes pnPop {
+  from {
+    transform: scale(0.3);
+  }
+}
+
+.pn-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 4px 11px 5px;
+  border-radius: 13px;
+  background: rgba(5, 8, 22, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.pn-chip small {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #8d95bd;
+}
+
+.pn-chip b {
+  font-size: 1.02rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.pn-chip.pn-is-live {
+  border-color: rgba(43, 217, 107, 0.55);
+}
+
+.pn-chip.pn-is-live b {
+  color: #5ff29a;
+}
+
+.pn-chip.pn-is-won {
+  border-color: rgba(255, 197, 61, 0.7);
+}
+
+.pn-chip.pn-is-won b {
+  color: #ffc53d;
+}
+
+.pn-chip.pn-is-lost b {
+  color: #ff6b79;
+}
+
+/* Escalera de multiplicadores (abajo a la derecha, sobre el césped) */
+.pn-ladder {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.pn-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 72px;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: rgba(5, 8, 22, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  font-size: 0.73rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #aab2dc;
+  transition: background 0.25s, border-color 0.25s, color 0.25s, transform 0.25s, box-shadow 0.25s;
+}
+
+.pn-step small {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #6c74a0;
+}
+
+.pn-step.pn-is-done {
+  color: #7ff0c9;
+  background: rgba(10, 60, 40, 0.72);
+  border-color: rgba(43, 217, 107, 0.45);
+}
+
+.pn-step.pn-is-done small {
+  color: #62c99b;
+}
+
+.pn-step.pn-is-next {
+  color: #fff;
+  background: rgba(70, 50, 8, 0.78);
+  border-color: rgba(255, 197, 61, 0.75);
+  box-shadow: 0 0 14px rgba(255, 197, 61, 0.3);
+  transform: translateX(-3px);
+}
+
+.pn-step.pn-is-next small {
+  color: #ffd67a;
+}
+
+.pn-step.pn-is-lost {
+  color: #ffb3bb;
+  background: rgba(80, 12, 22, 0.78);
+  border-color: rgba(255, 59, 78, 0.6);
+}
+
+/* Cartelito de ayuda entre el arco y la pelota */
+.pn-tip {
+  position: absolute;
+  left: 50%;
+  top: 52px;
+  z-index: 4;
+  transform: translate(-50%, 0);
+  max-width: calc(100% - 24px);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(5, 8, 22, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: #e8ecff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+.pn-tip.pn-show {
+  opacity: 1;
+}
+
+.pn-tip.pn-alert {
+  color: #ffe7a8;
+  border-color: rgba(255, 197, 61, 0.85);
+  animation: pnTipAlert 0.5s ease;
+}
+
+@keyframes pnTipAlert {
+  20% {
+    transform: translate(calc(-50% - 6px), 0);
+  }
+  40% {
+    transform: translate(calc(-50% + 6px), 0);
+  }
+  60% {
+    transform: translate(calc(-50% - 3px), 0);
+  }
+  80% {
+    transform: translate(calc(-50% + 3px), 0);
+  }
+}
+
+/* ¡GOOOL! / ¡ATAJÓ! */
+.pn-banner {
+  position: absolute;
+  left: 50%;
+  top: 29%;
+  z-index: 8;
+  transform: translate(-50%, -50%) rotate(-4deg);
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.pn-banner b {
+  display: block;
+  font-size: clamp(2.2rem, 12cqw, 3.4rem);
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.pn-banner small {
+  display: inline-block;
+  margin-top: 7px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: rgba(5, 8, 22, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.pn-banner-goal b {
+  color: #ffffff;
+  text-shadow:
+    3px 3px 0 #d52b1e,
+    6px 6px 0 #0038a8,
+    0 0 34px rgba(255, 255, 255, 0.45);
+}
+
+.pn-banner-save b {
+  color: #ff4254;
+  -webkit-text-stroke: 1.5px #ffffff;
+  text-shadow:
+    0 4px 0 #6d0b18,
+    0 0 30px rgba(255, 59, 78, 0.75);
+}
+
+.pn-banner.pn-show {
+  opacity: 1;
+  animation: pnBannerIn 0.55s cubic-bezier(0.2, 1.5, 0.35, 1) both;
+}
+
+@keyframes pnBannerIn {
+  from {
+    transform: translate(-50%, -50%) scale(0.3) rotate(-12deg);
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1) rotate(-4deg);
+  }
+}
+
+/* El cartel del resultado va sobre el césped (el arco queda a la vista) y el premio flota sobre el arco */
+.pn-stage .gv-result {
+  top: 64%;
+  left: 43%;
+}
+
+.pn-stage .win-pop {
+  top: 17%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pn-flag,
+  .pn-keeper .pn-sway,
+  .pn-can-kick .pn-cross,
+  .pn-zone.pn-aim .pn-cross,
+  .pn-crowd.pn-cheer,
+  .pn-kick,
+  .pn-stage.pn-shake,
+  .pn-tip.pn-alert {
+    animation: none !important;
+  }
+
+  .pn-can-kick .pn-cross {
+    opacity: 0.3;
+  }
+}

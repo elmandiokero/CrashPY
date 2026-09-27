@@ -6,6 +6,12 @@ const { startServer, Client, connectSocket, openDb } = require('./helpers');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Espera un evento del socket, o lo toma de los que ya llegaron (una ronda larga del Crash puede demorar). */
+function seenOrWait(s, name, pred, timeout = 90000) {
+  const seen = s.events.find((e) => e.name === name && pred(e.data));
+  return seen ? Promise.resolve(seen.data) : s.waitFor(name, pred, timeout);
+}
+
 let srv;
 let admin;
 let player;
@@ -56,30 +62,28 @@ test('con los bots prendidos aparecen marcados en el Crash, el Double, la Ruleta
   const online = await s.waitFor('online', (o) => o.bots === 10, 10000);
   assert.equal(online.bots, 10);
 
-  const bet = await s.waitFor('bet', (b) => b.bot, 20000);
+  const bet = await seenOrWait(s, 'bet', (b) => b.bot);
   assert.ok(bet.user.startsWith('🤖 '), 'el nombre del bot lleva 🤖');
   assert.match(String(bet.uid), /^bot:\d+$/);
   assert.equal(typeof bet.id, 'string');
 
-  const dbl = await s.waitFor('double:bet', (b) => b.bot, 30000);
+  const dbl = await seenOrWait(s, 'double:bet', (b) => b.bot);
   assert.ok(dbl.user.startsWith('🤖 '));
   assert.ok(['red', 'black', 'white'].includes(dbl.color));
 
   // En la Ruleta en vivo apuestan en la misma ronda que todos, con fichas válidas
-  const seenRl = player.s.events.find((e) => e.name === 'roulette:bet' && e.data.bot);
-  const rl = seenRl ? seenRl.data : await s.waitFor('roulette:bet', (b) => b.bot, 40000);
+  const rl = await seenOrWait(s, 'roulette:bet', (b) => b.bot);
   assert.ok(rl.user.startsWith('🤖 '));
   assert.ok(rl.bets.length > 0 && rl.bets.every((x) => x.amount > 0));
   assert.equal(rl.amount, rl.bets.reduce((t, x) => t + x.amount, 0));
 
-  const feed = await s.waitFor('feed', (batch) => batch.some((f) => f.bot), 30000);
+  const feed = await seenOrWait(s, 'feed', (batch) => batch.some((f) => f.bot));
   const item = feed.find((f) => f.bot);
   assert.ok(item.user.startsWith('🤖 '));
   assert.ok(['mines', 'penalty', 'plinko'].includes(item.game));
 
   // Al entrar, uno de los bots saluda (puede haber llegado antes: se busca también en lo ya recibido)
-  const seen = player.s.events.find((e) => e.name === 'chat' && e.data.role === 'bot');
-  const msg = seen ? seen.data : await s.waitFor('chat', (m) => m.role === 'bot', 15000);
+  const msg = await seenOrWait(s, 'chat', (m) => m.role === 'bot', 15000);
   assert.ok(msg.user.startsWith('🤖 '));
   assert.equal(msg.uid, null);
 
