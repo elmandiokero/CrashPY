@@ -6,3 +6,5 @@ data/
 Thumbs.db
 cloudflared-token.txt
 cloudflared.exe
+cloudflared-cred.json
+cloudflared-config.yml

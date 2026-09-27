@@ -56,57 +56,27 @@ Cuando arranca, la ventana muestra una línea **"En tu WiFi (cel): http://192.16
 
 Cloudflare Tunnel conecta tu PC con internet **sin abrir puertos en el router** y con **HTTPS** automático.
 
-### Opción A — Rápida (sin cuenta, dirección temporal)
-1. Instalá `cloudflared`: abrí **PowerShell** y ejecutá
-   ```
-   winget install --id Cloudflare.cloudflared
-   ```
-   (o descargá `cloudflared-windows-amd64.exe` desde <https://github.com/cloudflare/cloudflared/releases/latest>, renombralo a `cloudflared.exe` y ponelo en la carpeta de CrashPY).
-2. Con `INICIAR.bat` abierto, hacé doble clic en **`TUNEL-CLOUDFLARE.bat`**.
-3. Aparece una dirección tipo **`https://palabras-al-azar.trycloudflare.com`** → esa es la que compartís y abrís en el celular.
+### Con tu dominio (ej. `https://crash.alexlamasg.lat`) — todo automático
+Necesitás el dominio agregado a tu cuenta de Cloudflare (plan gratis). **No hace falta crear nada en el panel de Cloudflare ni buscar tokens.**
 
-⚠️ Esa dirección **cambia cada vez** que abrís el túnel. Sirve para probar; para el día a día usá la opción B.
-
-### Opción B — Permanente con tu dominio (ej. `https://crash.alexlamasg.lat`)
-Necesitás el dominio agregado a Cloudflare (plan gratis). Se hace una sola vez:
-
-**1. Crear el túnel en Cloudflare (desde el navegador)**
-1. Entrá a <https://one.dash.cloudflare.com> (también aparece como **Zero Trust** en el menú de tu cuenta de Cloudflare). Si te pide elegir plan, elegí **Free**.
-2. Andá a **Networks → Tunnels** (en algunas cuentas: *Networks → Connectors → Cloudflare Tunnels*) → **Create a tunnel** → **Cloudflared** → nombre: `crashpy` → **Save tunnel**.
-3. En la pantalla de instalación elegí **Windows** y **copiá el comando** que aparece (`cloudflared.exe service install eyJ...`). Guardalo, lo usás en el paso 2.
-4. **Next** → en **Public Hostname** (o *Published application routes*) completá:
-   - **Subdomain**: `crash` · **Domain**: `alexlamasg.lat` · **Path**: vacío
-   - **Service**: Type `HTTP` · URL `localhost:3000`
-   - **Save**. Cloudflare crea solo el registro DNS `crash` → no hace falta tocar DNS.
-   > Si da error porque ya existe un registro `crash` en **DNS → Records**, borralo y guardá de nuevo.
-
-**2. Conectar tu PC**
 1. Abrí `INICIAR.bat` (el juego tiene que estar corriendo).
-2. Abrí **`TUNEL-CLOUDFLARE.bat`**, **pegá el comando** que copiaste y apretá Enter. Si no tenías `cloudflared`, el script lo instala solo.
-   Queda guardado en `cloudflared-token.txt`, así que las próximas veces solo abrís el `.bat`.
-3. Cuando en esa ventana aparezca `Registered tunnel connection`, entrá desde el celular a **https://crash.alexlamasg.lat** 🎉 (panel: `https://crash.alexlamasg.lat/admin`).
+2. Abrí **`TUNEL-CLOUDFLARE.bat`** y elegí la opción **1**. Si no tenés `cloudflared`, el script lo instala solo.
+3. Confirmá el dominio con Enter (toma el de `PUBLIC_URL` en `.env`; por defecto `crash.alexlamasg.lat`).
+4. Se abre el navegador con Cloudflare: iniciá sesión, **tocá tu dominio** (`alexlamasg.lat`) y **Authorize**. Volvé a la ventana negra.
+5. El script crea solo el túnel `crashpy-pc` y el registro DNS, y conecta. Cuando aparezca `Registered tunnel connection`, entrá a **https://crash.alexlamasg.lat** 🎉 (panel: `/admin`).
 
-**3. (Recomendado) Dejarlo siempre encendido**
-Hacé doble clic en **`INSTALAR-TUNEL-SERVICIO.bat`** (pide permiso de administrador): instala el túnel como servicio de Windows y arranca solo con la PC. Desde ahí solo necesitás `INICIAR.bat`.
+Las próximas veces solo abrís `TUNEL-CLOUDFLARE.bat` y se conecta directo.
 
-> ⚠️ El archivo `cloudflared-token.txt` es una llave de tu túnel: no lo compartas ni lo subas a GitHub (ya está excluido en `.gitignore`).
+**Para que arranque solo con la PC:** doble clic en **`ARRANQUE-AUTOMATICO.bat`**. Cada vez que inicies sesión en Windows se abren minimizados el juego y el túnel. Si lo volvés a abrir, te ofrece desactivarlo.
 
-**Desde la consola (alternativa avanzada):**
-```
-cloudflared tunnel login
-cloudflared tunnel create crashpy
-cloudflared tunnel route dns crashpy juego.tudominio.com
-```
-Después creá el archivo `C:\Users\TU_USUARIO\.cloudflared\config.yml`:
-```yaml
-tunnel: crashpy
-credentials-file: C:\Users\TU_USUARIO\.cloudflared\ID-DEL-TUNEL.json
-ingress:
-  - hostname: juego.tudominio.com
-    service: http://localhost:3000
-  - service: http_status:404
-```
-y arrancalo con `cloudflared tunnel run crashpy` (el archivo `.json` lo crea el paso `tunnel create`).
+> ⚠️ `cloudflared-config.yml`, `cloudflared-cred.json` y `cloudflared-token.txt` son las llaves de tu túnel: no los compartas (ya están excluidos de GitHub en `.gitignore`).
+> Si antes creaste un túnel desde el panel de Cloudflare (por ejemplo `crashpy`) y no lo usás, lo podés borrar desde *Tunnels*; no molesta.
+
+### Otras opciones del mismo script
+- **Opción 2 — pegar un token:** si creaste el túnel desde el panel de Cloudflare y tenés el comando `cloudflared.exe service install eyJ...`, pegalo entero. En ese caso la ruta pública (`crash` → `http://localhost:3000`) se configura en el panel del túnel.
+- **Opción 3 — túnel rápido de prueba:** te da una dirección `https://palabras-al-azar.trycloudflare.com` sin cuenta. Cambia cada vez que lo abrís.
+
+**Para volver a configurar** (otro dominio u otra cuenta): borrá `cloudflared-config.yml` (y `cloudflared-token.txt` si existe) y abrí `TUNEL-CLOUDFLARE.bat` de nuevo.
 
 > Los WebSockets (tiempo real) funcionan con Cloudflare sin configurar nada extra.
 > Recomendado: en Cloudflare activá **"Always Use HTTPS"**.
@@ -172,8 +142,7 @@ La ronda queda marcada como **anulada** en el historial público junto con su ha
 ## ⏰ Para tenerlo abierto 24/7
 
 - En Windows: *Configuración → Sistema → Inicio/apagado y suspensión* → **Suspender: Nunca** (si la PC se duerme, el juego se corta).
-- Usá la **opción B** del túnel (queda como servicio y arranca solo con Windows).
-- Para que CrashPY también arranque solo: tocá `Win + R`, escribí `shell:startup` y poné ahí un **acceso directo a `INICIAR.bat`**.
+- Hacé doble clic en **`ARRANQUE-AUTOMATICO.bat`**: el juego y el túnel se abren solos cada vez que iniciás sesión en Windows.
 - Si podés, conectá la PC por cable y con una UPS. Si igual se corta la luz en medio de una ronda, al volver se devuelven las apuestas de esa ronda.
 
 ## 🧰 Problemas comunes
@@ -184,11 +153,11 @@ La ronda queda marcada como **anulada** en el historial público junto con su ha
 | "El puerto 3000 ya está en uso" | Ya hay otra ventana de CrashPY abierta. Cerrala o cambiá `PORT` en `.env` (y usá el mismo en el túnel). |
 | Me olvidé la contraseña del admin | Con el servidor apagado ejecutá `npm run reset-admin -- NuevaClave123` en la carpeta del proyecto. |
 | El celular no entra por WiFi | Permití "Node.js" en el Firewall de Windows (Redes privadas) y verificá que estén en la misma red. |
-| La dirección trycloudflare cambió | Es normal en la opción rápida. Usá la opción B (dominio propio) para una dirección fija. |
-| Cloudflare muestra **Error 1033** | El túnel no está conectado: abrí `TUNEL-CLOUDFLARE.bat` (o revisá que el servicio `cloudflared` esté iniciado). |
+| La dirección trycloudflare cambió | Es normal en el túnel rápido (opción 3). Usá la opción 1 (tu dominio) para una dirección fija. |
+| Cloudflare muestra **Error 1033** | El túnel no está conectado: abrí `TUNEL-CLOUDFLARE.bat` y esperá `Registered tunnel connection`. |
 | Cloudflare muestra **502 Bad Gateway** | El túnel funciona pero el juego no: abrí `INICIAR.bat` y revisá que el túnel apunte a `localhost:3000` (el mismo `PORT` del `.env`). |
 | El juego queda en "Reconectando…" por internet | En Cloudflare → tu dominio → **Network**: **WebSockets** activado. Y no uses el modo *Under Attack* para este subdominio. |
-| Cambió el token o querés otro túnel | Borrá `cloudflared-token.txt` y abrí `TUNEL-CLOUDFLARE.bat` de nuevo. |
+| Querés rehacer la configuración del túnel | Borrá `cloudflared-config.yml` y `cloudflared-token.txt` y abrí `TUNEL-CLOUDFLARE.bat` de nuevo. |
 
 ## ⚖️ Aviso legal
 
