@@ -311,9 +311,11 @@ module.exports = function publicRoutes(ctx) {
   // ───────────────────────── 🎡 Double ─────────────────────────
 
   router.get('/double/rounds', (req, res) => {
+    // played=1 → solo las rondas que se jugaron (sin las anuladas antes de girar)
+    const statuses = req.query.played === '1' ? "('ended')" : "('ended', 'cancelled')";
     const items = db.all(
       `SELECT id, chain_id, chain_index, hash, result, status, ended_at, total_bet, total_payout, players
-       FROM double_rounds WHERE status IN ('ended', 'cancelled') ORDER BY id DESC LIMIT ?`,
+       FROM double_rounds WHERE status IN ${statuses} ORDER BY id DESC LIMIT ?`,
       limitOf(req, 50, 200),
     );
     res.json({ items });

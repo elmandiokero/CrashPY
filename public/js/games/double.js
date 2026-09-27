@@ -681,11 +681,12 @@ export function createDouble(shell) {
     const uid = myId();
     const groups = { red: [], black: [], white: [] };
     const players = new Set();
+    const bots = new Set();
     let total = 0;
     for (const b of st.bets.values()) {
       if (b.status === 'refunded' || !groups[b.color]) continue;
       groups[b.color].push(b);
-      players.add(String(b.uid));
+      (b.bot ? bots : players).add(String(b.uid));
       total += b.amount;
     }
     const res = shown ? shown.color : null;
@@ -701,7 +702,8 @@ export function createDouble(shell) {
       if (!rows.length) rows.push(h('div', { class: 'db-col-empty' }, st.phase === 'BETTING' && !res ? 'Sin apuestas todavía' : 'Sin apuestas'));
       col.list.replaceChildren(...rows);
     }
-    setText(el.betsPlayers, `👥 ${players.size} jugador${players.size === 1 ? '' : 'es'}`);
+    // Los bots se cuentan aparte: nunca se hacen pasar por jugadores
+    setText(el.betsPlayers, `👥 ${players.size} jugador${players.size === 1 ? '' : 'es'}${bots.size ? ` · 🤖 ${bots.size} bot${bots.size === 1 ? '' : 's'}` : ''}`);
     setText(el.betsTotal, fmtGs(total));
   }
 
@@ -824,8 +826,8 @@ export function createDouble(shell) {
     if (last100 || last100Loading) return;
     last100Loading = true;
     try {
-      // Pedimos unas de más: las rondas anuladas (que no se jugaron) no cuentan
-      const { items } = await api('/api/double/rounds?limit=120');
+      // Solo rondas jugadas (las anuladas no cuentan)
+      const { items } = await api('/api/double/rounds?limit=100&played=1');
       const list = items.filter((r) => r.status === 'ended').map((r) => ({ id: r.id, result: r.result }));
       // Rondas que terminaron mientras cargaba (o que la cinta ya mostró)
       for (const r of st.history.slice().reverse()) if (!list.length || r.id > list[0].id) list.unshift(r);

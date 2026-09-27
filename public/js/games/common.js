@@ -61,7 +61,8 @@ export function setClass(el, cls) {
 export function avatar(name, size) {
   const style = { background: colorFor(name) };
   if (size) Object.assign(style, { width: size + 'px', height: size + 'px', fontSize: size * 0.4 + 'px' });
-  return h('span', { class: 'avatar', style }, String(name || '?').slice(0, 1));
+  // Array.from separa bien los emojis (ej. "🤖 Tito")
+  return h('span', { class: 'avatar', style }, Array.from(String(name || '?'))[0]);
 }
 
 export function compact(n) {
