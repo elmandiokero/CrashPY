@@ -15,7 +15,7 @@ const ACTIONS_PER_10S = 80;
  *  - Namespace "/admin" → solo administradores (estadísticas en vivo, avisos de depósitos/retiros, actividad).
  */
 module.exports = function setupSockets(io, ctx) {
-  const { db, auth, engine, chat, bus, settings, chains, plays, double } = ctx;
+  const { db, auth, engine, chat, bus, settings, chains, plays, double, bots } = ctx;
   const limiter = new RateLimiter();
   const online = new Map(); // userId → { id, username, sockets, since, ip, ua }
 
@@ -39,7 +39,7 @@ module.exports = function setupSockets(io, ctx) {
   });
 
   let onlineDirty = true;
-  const onlinePayload = () => ({ n: io.of('/').sockets.size, users: online.size });
+  const onlinePayload = () => ({ n: io.of('/').sockets.size, users: online.size, bots: bots.activeCount() });
   const onlineTimer = setInterval(() => {
     if (!onlineDirty) return;
     onlineDirty = false;
@@ -60,9 +60,14 @@ module.exports = function setupSockets(io, ctx) {
     const batch = feedQueue.slice(-FEED_SIZE);
     feedQueue = [];
     io.emit('feed', batch);
-    io.of('/admin').emit('feed', batch);
+    // El panel de admin solo ve jugadas reales (los bots tienen su propia sección)
+    const real = batch.filter((f) => !f.bot);
+    if (real.length) io.of('/admin').emit('feed', real);
   }, FEED_EVERY_MS);
   feedTimer.unref();
+
+  /** Suma las apuestas de los bots (marcadas con bot: true) al estado público de un juego. */
+  const withBots = (state, botBets) => (botBets.length ? { ...state, bets: [...state.bets, ...botBets] } : state);
 
   function snapshot(user) {
     return {
@@ -70,9 +75,9 @@ module.exports = function setupSockets(io, ctx) {
       user: publicUser(user),
       settings: settings.publicAll(),
       fair: chains.summary(),
-      game: engine.publicState(),
+      game: withBots(engine.publicState(), bots.crashBets()),
       mine: user ? engine.userBets(user.id) : [null, null],
-      double: double.publicState(),
+      double: withBots(double.publicState(), bots.doubleBets()),
       myDouble: user ? double.userBets(user.id) : null,
       plays: user ? plays.activePlays(user.id) : { mines: null, penalty: null },
       feed: recentFeed,
@@ -192,6 +197,15 @@ module.exports = function setupSockets(io, ctx) {
   for (const name of ['betting', 'bet', 'spin', 'result', 'refund', 'paused']) {
     double.on(name, (d) => io.emit('double:' + name, d));
   }
+
+  // Bots → mismos eventos que los jugadores, siempre con bot: true y 🤖 en el nombre
+  bots.on('crash:bet', (b) => io.emit('bet', b));
+  bots.on('crash:cashout', (d) => io.emit('cashout', d));
+  bots.on('crash:refund', (d) => io.emit('betRefund', d));
+  bots.on('double:bet', (b) => io.emit('double:bet', b));
+  bots.on('online', () => {
+    onlineDirty = true;
+  });
 
   // Eventos privados de cada usuario
   bus.on('balance', (userId, balance) => io.to('u:' + userId).emit('balance', { balance }));

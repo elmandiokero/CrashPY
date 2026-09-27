@@ -253,6 +253,16 @@ CREATE TABLE IF NOT EXISTS double_bets (
 );
 CREATE INDEX IF NOT EXISTS idx_double_bets_round ON double_bets(round_id);
 CREATE INDEX IF NOT EXISTS idx_double_bets_user ON double_bets(user_id, id);
+
+-- Resultados de los bots (plata ficticia): separados de todo lo real
+CREATE TABLE IF NOT EXISTS bot_stats (
+  day TEXT NOT NULL,
+  game TEXT NOT NULL,
+  plays INTEGER NOT NULL DEFAULT 0,
+  bet INTEGER NOT NULL DEFAULT 0,
+  payout INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, game)
+);
 `;
 
 /** Cambios de estructura para bases creadas con versiones anteriores. */

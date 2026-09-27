@@ -36,9 +36,10 @@ const GROUPS = [
     keys: ['min_deposit', 'min_withdraw', 'max_withdraw', 'bank_name', 'bank_holder', 'bank_doc', 'bank_account', 'bank_alias', 'bank_notes', 'support_whatsapp'],
   },
   { title: 'Comunidad', icon: 'chat', keys: ['site_name', 'banner', 'chat_enabled', 'bigwin_multiplier', 'bigwin_amount', 'signup_bonus'] },
+  { title: 'Bots 🤖', icon: 'bot', keys: ['bots_enabled', 'bots_count', 'bots_chat', 'bots_max_bet'] },
 ];
 
-const MONEY = new Set(['min_bet', 'max_bet', 'max_profit', 'min_deposit', 'min_withdraw', 'max_withdraw', 'bigwin_amount', 'signup_bonus']);
+const MONEY = new Set(['min_bet', 'max_bet', 'max_profit', 'min_deposit', 'min_withdraw', 'max_withdraw', 'bigwin_amount', 'signup_bonus', 'bots_max_bet']);
 const TEXTAREA = new Set(['bank_notes', 'banner']);
 const SUFFIX = { betting_seconds: 'seg.', double_betting_seconds: 'seg.', speed: 'x', bigwin_multiplier: 'x' };
 const PLACEHOLDER = {
@@ -65,6 +66,10 @@ const HINTS = {
   game_plinko: 'Si lo apagás nadie puede soltar bolitas hasta que lo vuelvas a prender.',
   game_roulette: 'Si lo apagás nadie puede girar la ruleta hasta que la vuelvas a prender.',
   double_betting_seconds: 'Double: tiempo para apostar antes de cada giro (de 5 a 30 segundos). Se aplica desde la próxima ronda.',
+  bots_enabled: 'Jugadores de la sala marcados con 🤖 que juegan con plata ficticia. No tocan la caja ni las estadísticas reales (ver Admin → Bots).',
+  bots_count: 'Cuántos bots hay en la sala (de 1 a 40).',
+  bots_chat: 'Comentan el juego de vez en cuando, siempre con la etiqueta BOT.',
+  bots_max_bet: 'Apuesta máxima de un bot (plata ficticia).',
   min_deposit: 'Depósito mínimo que puede informar un jugador. 0 = sin mínimo.',
   min_withdraw: 'Retiro mínimo que puede pedir un jugador.',
   max_withdraw: 'Tope por pedido de retiro. 0 = sin límite.',

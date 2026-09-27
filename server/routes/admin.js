@@ -424,6 +424,10 @@ module.exports = function adminRoutes(ctx) {
     res.json({ items, total, page: page + 1, pages: Math.max(1, Math.ceil(total / PAGE)) });
   });
 
+  router.get('/bots', (req, res) => {
+    res.json(ctx.bots.report());
+  });
+
   router.get('/double', (req, res) => {
     const items = db.all(
       `SELECT id, chain_id, chain_index, hash, result, status, spun_at, ended_at, total_bet, total_payout, total_refund, players

@@ -45,6 +45,7 @@ Las partidas de Minas y Penales quedan guardadas: si se cierra la página, al vo
 - **Depósitos** (con foto del comprobante) y **retiros** (con datos bancarios para copiar): aprobar / rechazar con un toque. Avisos con sonido.
 - **Chat**: borrar mensajes, silenciar, anuncios.
 - **Configuración**: apuestas mínimas/máximas, ganancia máxima, juegos activos, tiempos de apuesta del Crash y del Double, datos bancarios, WhatsApp de soporte, bono de bienvenida…
+- **🤖 Bots** (opcional): jugadores de la sala que animan el casino — apuestan en todos los juegos y comentan en el chat. Ver abajo.
 - **Auditoría**: todo lo que hace cada admin queda registrado. **Libro contable**: cada guaraní que entra o sale queda anotado.
 - **Respaldos** automáticos de la base de datos cada 6 horas y descarga manual.
 
@@ -96,6 +97,18 @@ Las próximas veces solo abrís `TUNEL-CLOUDFLARE.bat` y se conecta directo.
 
 > Los WebSockets (tiempo real) funcionan con Cloudflare sin configurar nada extra.
 > Recomendado: en Cloudflare activá **"Always Use HTTPS"**.
+
+---
+
+## 🤖 Bots para darle vida a la sala
+
+En *Admin → Bots* podés prender bots (de 1 a 40) que juegan todos los juegos y comentan en el chat, así la sala nunca se ve vacía.
+
+- **Siempre se ven como bots**: el nombre empieza con 🤖, en el chat llevan la etiqueta **BOT** y el contador dice "1 en línea · 🤖 12 bots". Nadie los confunde con jugadores reales (hacerlos pasar por personas sería engañar a quien apuesta plata de verdad).
+- **Plata ficticia**: no tienen saldo, no depositan ni retiran y no tocan el libro contable ni la caja.
+- **Mismas probabilidades que todos**: juegan con la misma matemática y **no cambian ningún resultado real** (el Crash y el Double salen de la cadena de hashes; los demás, de las semillas de cada jugador).
+- **Fuera de las estadísticas reales**: el inicio del panel, los gráficos, el Top y las jugadas del panel muestran solo lo real. Lo que ganan o pierden los bots se ve **aparte**, en *Admin → Bots* (por juego y por día).
+- En el chat comentan el juego de vez en cuando; **nunca hablan de depósitos o retiros ni empujan a nadie a apostar**. Se puede apagar solo el chat de los bots.
 
 ---
 
@@ -216,6 +229,7 @@ server/
   fair.js         cadenas de hashes y fórmula del punto de explosión
   wallet.js       saldos, libro contable, depósitos, retiros, ajustes
   stats.js        estadísticas del panel (por juego)
+  bots.js         bots de la sala (marcados con 🤖, plata ficticia, estadísticas aparte)
   sockets.js      tiempo real (jugadores y /admin)
   routes/         API REST pública y de administración
 public/

@@ -807,3 +807,53 @@
     animation: none;
   }
 }
+
+/* ───────── 🤖 Bots de la sala (siempre marcados) ───────── */
+.bot-avatar {
+  background: linear-gradient(135deg, #3a3f6e, #22284d) !important;
+  font-size: 0.82rem;
+}
+
+.bot-badge {
+  display: inline-block;
+  flex-shrink: 0;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  color: #d9d1ff;
+  background: rgba(155, 123, 255, 0.18);
+  border: 1px solid rgba(155, 123, 255, 0.45);
+  vertical-align: 1px;
+}
+
+.bet-row.bot {
+  opacity: 0.8;
+}
+
+.bet-row.bot .bet-user > span:nth-child(2) {
+  color: var(--muted);
+}
+
+.msg.bot .msg-body {
+  background: rgba(155, 123, 255, 0.07);
+  border: 1px dashed rgba(155, 123, 255, 0.28);
+}
+
+.bet-row.bot .bet-user > span:nth-child(2) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bet-row.bot .bet-user {
+  padding-right: 6px;
+}
+
+.feed-row.partial .bet-win {
+  color: #ffd58a;
+}

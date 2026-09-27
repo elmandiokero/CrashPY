@@ -736,11 +736,12 @@ export function createCrash(shell) {
     const list = [...cs.bets.values()].filter((b) => b.status !== 'cancelled');
     list.sort((a, b) => b.amount - a.amount || a.id - b.id);
     const total = list.reduce((sum, b) => sum + (b.status === 'refunded' ? 0 : b.amount), 0);
-    const players = new Set(list.map((b) => b.uid)).size;
+    const players = new Set(list.filter((b) => !b.bot).map((b) => b.uid)).size;
+    const botsN = new Set(list.filter((b) => b.bot).map((b) => b.uid)).size;
     els.betsCount.textContent = String(list.length);
-    els.betsPlayers.textContent = `${players} jugador${players === 1 ? '' : 'es'}`;
+    els.betsPlayers.textContent = `${players} jugador${players === 1 ? '' : 'es'}${botsN ? ` · 🤖 ${botsN} bot${botsN === 1 ? '' : 's'}` : ''}`;
     els.betsTotal.textContent = fmtGs(total);
-    els.roundPlayers.textContent = `👥 ${players}`;
+    els.roundPlayers.textContent = botsN ? `👥 ${players} · 🤖 ${botsN}` : `👥 ${players}`;
     els.roundTotal.textContent = fmtGs(total);
     const me = shell.state.user ? shell.state.user.id : null;
     const rows = list.slice(0, 150).map((b) => {
@@ -748,8 +749,8 @@ export function createCrash(shell) {
       const cls = b.status === 'won' ? 'won' : lost ? 'lost' : b.status === 'refunded' ? 'refunded' : '';
       return h(
         'div',
-        { class: `bet-row ${cls}${b.uid === me ? ' me' : ''}` },
-        h('div', { class: 'bet-user' }, avatar(b.user), h('span', null, b.user)),
+        { class: `bet-row ${cls}${b.uid === me ? ' me' : ''}${b.bot ? ' bot' : ''}` },
+        h('div', { class: 'bet-user' }, b.bot ? h('span', { class: 'avatar bot-avatar', title: 'Bot (plata ficticia)' }, '🤖') : avatar(b.user), h('span', null, b.bot ? b.user.replace(/^🤖\s*/, '') : b.user), b.bot ? h('span', { class: 'bot-badge' }, 'BOT') : null),
         h('div', { class: 'bet-amount' }, fmtNum(b.amount)),
         h('div', { class: `bet-mult ${b.cashout ? multClass(b.cashout) : 'muted'}` }, b.cashout ? fmtMult(b.cashout) : b.status === 'refunded' ? '↩' : '—'),
         h('div', { class: 'bet-win' }, b.payout ? fmtNum(b.payout) : lost ? '💥' : '—'),

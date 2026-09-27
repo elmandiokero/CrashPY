@@ -9,11 +9,13 @@ import { chatView } from './admin-chat.js';
 import { settingsView, fairView } from './admin-settings.js';
 import { ledgerView, auditView } from './admin-logs.js';
 import { gamesView } from './admin-games.js';
+import { botsView } from './admin-bots.js';
 
 const VIEWS = [
   { id: 'inicio', path: 'inicio', label: 'Inicio', icon: 'grid', group: 'op', mod: dashboardView, bottom: true },
   { id: 'vivo', path: 'en-vivo', label: 'En vivo', icon: 'activity', group: 'op', mod: liveView, bottom: true },
   { id: 'juegos', path: 'juegos', label: 'Juegos', icon: 'gamepad', group: 'op', mod: gamesView },
+  { id: 'bots', path: 'bots', label: 'Bots', icon: 'bot', group: 'op', mod: botsView },
   { id: 'usuarios', path: 'usuarios', label: 'Usuarios', icon: 'users', group: 'op', mod: usersView, bottom: true },
   { id: 'depositos', path: 'depositos', label: 'Depósitos', icon: 'deposit', group: 'op', mod: depositsView, bottom: true, badge: 'deposits' },
   { id: 'retiros', path: 'retiros', label: 'Retiros', icon: 'withdraw', group: 'op', mod: withdrawalsView, bottom: true, badge: 'withdrawals' },

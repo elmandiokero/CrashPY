@@ -202,16 +202,16 @@ function feedCard() {
   const el = card('Jugadas en vivo', { icon: 'activity', cls: 'gm-feed-card' }, list, empty);
   const row = (f) => {
     const meta = GAME_META[f.game] || GAME_META.crash;
-    const won = f.payout > 0;
+    const net = f.payout - f.amount;
     return h(
       'div',
-      { class: `gm-feed-row ${won ? 'won' : 'lost'}` },
+      { class: `gm-feed-row ${net > 0 ? 'won' : 'lost'}` },
       h('span', { class: 'gm-feed-time' }, fmtTime(f.ts)),
       h('span', { class: 'gm-feed-game', title: meta.name }, meta.icon),
       h('span', { class: 'gm-feed-user' }, f.user),
       h('span', { class: 'num' }, fmtGs(f.amount)),
-      h('span', { class: `num ${won ? 'green' : 'faint'}` }, won ? fmtMult(f.multiplier) : '0.00x'),
-      h('span', { class: `num ${won ? 'green' : 'red'}` }, won ? '+' + fmtGs(f.payout - f.amount) : '−' + fmtGs(f.amount)),
+      h('span', { class: `num ${net > 0 ? 'green' : 'faint'}` }, fmtMult(f.payout > 0 ? f.multiplier : 0)),
+      h('span', { class: `num ${signClass(net)}` }, (net > 0 ? '+' : net < 0 ? '−' : '') + fmtGs(Math.abs(net))),
     );
   };
   const renderAll = () => {

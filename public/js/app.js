@@ -389,7 +389,8 @@ socket.on('online', (o) => {
 
 function renderOnline() {
   els.onlineCount.textContent = fmtNum(state.online.n);
-  els.chatOnline.textContent = `· ${fmtNum(state.online.n)} en línea`;
+  const bots = state.online.bots || 0;
+  els.chatOnline.textContent = `· ${fmtNum(state.online.n)} en línea${bots ? ` · 🤖 ${fmtNum(bots)} bot${bots === 1 ? '' : 's'}` : ''}`;
 }
 
 // ═══════════════ Jugadas en vivo (todos los juegos) ═══════════════
@@ -405,14 +406,15 @@ function renderFeed(fresh = 0) {
   const me = state.user ? state.user.username : null;
   const rows = state.feed.slice(0, 25).map((f, i) => {
     const g = GAME_BY_ID[f.game] || GAME_BY_ID.crash;
-    const won = f.payout > 0;
+    const won = f.payout > f.amount; // ganó plata
+    const back = f.payout > 0; // cobró algo (en Plinko puede ser menos que lo apostado)
     return h(
       'div',
-      { class: `bet-row feed-row ${won ? 'won' : 'lost'}${f.user === me ? ' me' : ''}${i < fresh ? ' fresh' : ''}${f.game === shell.current ? ' here' : ''}` },
+      { class: `bet-row feed-row ${won ? 'won' : back ? 'partial' : 'lost'}${f.user === me ? ' me' : ''}${f.bot ? ' bot' : ''}${i < fresh ? ' fresh' : ''}${f.game === shell.current ? ' here' : ''}` },
       h('div', { class: 'bet-user' }, h('span', { class: 'feed-game', title: g.name }, g.icon), h('span', null, f.user)),
       h('div', { class: 'bet-amount' }, fmtNum(f.amount)),
-      h('div', { class: `bet-mult ${won ? multClass(f.multiplier) : 'muted'}` }, won ? fmtMult(f.multiplier) : '0.00x'),
-      h('div', { class: 'bet-win' }, won ? fmtNum(f.payout) : '—'),
+      h('div', { class: `bet-mult ${won ? multClass(f.multiplier) : 'muted'}` }, fmtMult(back ? f.multiplier : 0)),
+      h('div', { class: 'bet-win' }, back ? fmtNum(f.payout) : '—'),
     );
   });
   if (!rows.length) rows.push(h('div', { class: 'empty' }, 'Todavía no hay jugadas. ¡Arrancá vos! 🎲'));
@@ -547,18 +549,20 @@ function chatMessageNode(m) {
   if (m.kind === 'user') {
     const mine = !!(state.user && m.uid === state.user.id);
     const isAdmin = m.role === 'admin';
+    const isBot = m.role === 'bot';
     return h(
       'div',
-      { class: `msg${mine ? ' me' : ''}${isAdmin ? ' admin' : ''}`, 'data-id': m.id },
-      avatar(m.user),
+      { class: `msg${mine ? ' me' : ''}${isAdmin ? ' admin' : ''}${isBot ? ' bot' : ''}`, 'data-id': m.id },
+      isBot ? h('span', { class: 'avatar bot-avatar', title: 'Bot (no es un jugador real)' }, '🤖') : avatar(m.user),
       h(
         'div',
         { class: 'msg-body' },
         h(
           'div',
           { class: 'msg-meta' },
-          h('span', { class: 'msg-user', style: { color: isAdmin ? 'var(--gold)' : colorFor(m.user) } }, m.user),
+          h('span', { class: 'msg-user', style: { color: isAdmin ? 'var(--gold)' : isBot ? 'var(--muted)' : colorFor(m.user) } }, m.user),
           isAdmin ? h('span', { class: 'admin-badge' }, 'ADMIN') : null,
+          isBot ? h('span', { class: 'bot-badge', title: 'Bot de la sala: juega con plata ficticia' }, 'BOT') : null,
           h('span', { class: 'msg-time' }, fmtTime(m.ts)),
         ),
         h('div', { class: 'msg-text' }, m.text),
@@ -1313,6 +1317,9 @@ function openRules() {
         li(`Ganancia máxima por apuesta o jugada: ${fmtGs(s.max_profit)}.`),
         li('Retorno al jugador (RTP): 97% en Crash, Minas, Penales y Plinko · 97,3% en la Ruleta · 96,8% en el Double.'),
         li('Si el servidor se reinicia en medio de una ronda, nadie pierde: las apuestas se devuelven (o se pagan si el resultado ya se había mostrado).'),
+        state.online.bots
+          ? li('Los jugadores con 🤖 son bots de la sala: animan con plata ficticia, juegan con las mismas probabilidades que vos y no cambian ningún resultado.')
+          : null,
       ),
       h('h4', null, '🔐 Juego comprobable'),
       h(

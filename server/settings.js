@@ -34,6 +34,10 @@ const SCHEMA = {
   game_plinko: { type: 'bool', def: true, public: true, label: '🔴 Plinko habilitado' },
   game_roulette: { type: 'bool', def: true, public: true, label: '🎰 Ruleta habilitada' },
   double_betting_seconds: { type: 'int', min: 5, max: 30, def: 15, public: true, label: 'Double: segundos para apostar' },
+  bots_enabled: { type: 'bool', def: false, public: false, label: '🤖 Bots activos' },
+  bots_count: { type: 'int', min: 1, max: 40, def: 12, public: false, label: 'Cantidad de bots' },
+  bots_chat: { type: 'bool', def: true, public: false, label: 'Los bots comentan en el chat' },
+  bots_max_bet: { type: 'int', min: 100, max: 1e9, def: 50000, public: false, label: 'Apuesta máxima de los bots' },
 };
 
 class Settings {

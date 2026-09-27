@@ -65,6 +65,13 @@ class Chat {
     return this._insert({ kind, text: String(text).slice(0, 300) });
   }
 
+  /** Mensaje de un bot (siempre con la etiqueta BOT y el 🤖 en el nombre). */
+  bot(name, raw) {
+    const text = cleanText(raw, 200);
+    if (!text) return null;
+    return this._insert({ user: name, role: 'bot', kind: 'user', text });
+  }
+
   /** Anuncio destacado del administrador. */
   announce(admin, raw) {
     const text = cleanText(raw, 300);

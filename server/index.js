@@ -25,6 +25,7 @@ const { GameEngine } = require('./game');
 const { Seeds } = require('./games/seeds');
 const { PlayEngine } = require('./games/plays');
 const { DoubleEngine } = require('./games/double');
+const { BotManager } = require('./bots');
 const { Backups } = require('./backup');
 const { AppError, RateLimiter, randomPassword } = require('./util');
 const publicRoutes = require('./routes/public');
@@ -52,6 +53,8 @@ const plays = new PlayEngine({ db, wallet, settings, bus, seeds });
 const doubleChains = new ChainManager(db, { game: 'double', length: config.CHAIN_LENGTH, defaultEdgeBps: 323 });
 doubleChains.init();
 const double = new DoubleEngine({ db, chains: doubleChains, settings, wallet, bus });
+// Bots marcados con 🤖 que animan la sala con plata ficticia (no tocan nada real)
+const bots = new BotManager({ db, engine, double, chat, settings, bus });
 const limiter = new RateLimiter();
 const ctx = {
   db,
@@ -66,6 +69,7 @@ const ctx = {
   plays,
   double,
   doubleChains,
+  bots,
   backups,
   limiter,
   config,
@@ -183,6 +187,7 @@ async function main() {
   await ensureAdmin();
   engine.start();
   double.start();
+  bots.start();
   server.listen(config.PORT, config.HOST, () => {
     console.log(`\n🚀 CrashPY está en línea`);
     console.log(`   En esta PC:       http://localhost:${config.PORT}`);
@@ -214,6 +219,7 @@ function shutdown(signal) {
   console.log(`\n⏹️  Apagando (${signal})... las apuestas de la ronda en curso se devuelven.`);
   engine.shutdown();
   double.shutdown();
+  bots.shutdown();
   io.close();
   server.close();
   setTimeout(() => {
