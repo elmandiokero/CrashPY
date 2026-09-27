@@ -134,8 +134,16 @@ button.pk-chip:active {
   display: block;
 }
 
+/* Sin panel al costado (el botón queda debajo): el tablero deja lugar para ver SOLTAR */
+@container gameview (max-width: 619px) {
+  .pk-board {
+    max-height: max(240px, calc(100vh - 300px));
+    max-height: max(240px, calc(100dvh - 300px));
+  }
+}
+
 /* Escenario ancho: resultados en una columna a la derecha del tablero */
-@container pkstage (min-width: 560px) {
+@container pkstage (min-width: 520px) {
   .pk-layout {
     grid-template-columns: minmax(0, 1fr) 62px;
     grid-template-areas:
@@ -264,6 +272,7 @@ button.pk-chip:active {
   letter-spacing: 0.02em;
 }
 
+/* Detalle de una jugada (modal compartido): que entren los 17 multiplicadores en el celular */
 @media (prefers-reduced-motion: reduce) {
   .pk-chip.pk-new,
   .pk-auto-bar i {

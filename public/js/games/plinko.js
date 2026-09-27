@@ -286,11 +286,18 @@ class PlinkoBoard {
     const emN = emOf(labels);
     ctx.restore();
     const avail = g.bw - 3;
-    const maxFont = clamp(g.s * 0.42, 7, 14);
-    // Con "x" si entra a un tamaño legible (se permite letra un poco más angosta)
-    const withX = (avail / emX) * 1.12 >= 9.5;
+    const maxFont = clamp(g.s * 0.5, 7.5, 14);
+    // Letra un poco más angosta antes que más chica (hasta 80% si no queda otra)
+    const fit = (em) => {
+      const f = Math.min(maxFont, avail / em / 0.88);
+      return f >= 9 ? f : Math.min(maxFont, avail / em / 0.8);
+    };
+    const fontN = fit(emN);
+    const fontX = fit(emX);
+    // Con "x" solo si se sigue leyendo bien
+    const withX = fontX >= Math.max(10, fontN * 0.8);
     const em = withX ? emX : emN;
-    const font = Math.max(6, Math.min(maxFont, (avail / em) * 1.12));
+    const font = Math.max(6, withX ? fontX : fontN);
     const scaleX = Math.min(1, avail / (em * font));
     this.buckets = this.table.map((m, k) => {
       const col = heat(edgeOf(k, g.R));
@@ -633,8 +640,7 @@ export function createPlinko(shell) {
   let visible = false;
   let pending = 0; // pedidos al servidor sin respuesta
   let lastDrop = 0;
-  let auto = null; // { total, sent, landed, net, running, reason, timer, inflight }
-  const history = []; // últimos resultados, el más nuevo primero
+  let auto = null; // { total, sent, landed, net, running, reason, timer, inflight, done }
   let lastPegSound = 0;
   let lastLandSound = 0;
   let lastConfetti = 0;
@@ -643,7 +649,6 @@ export function createPlinko(shell) {
   const flying = () => (board ? board.flying() : 0);
   const busy = () => pending > 0 || flying() > 0;
   const paused = () => S().game_plinko === false;
-  const maxOf = (r, k) => Math.max(...core.PLINKO[r][k]);
 
   function pickRows(v) {
     const n = Number(v);
@@ -733,7 +738,7 @@ export function createPlinko(shell) {
         finishAll();
       } else if (!document.hidden && visible) board.redraw();
     });
-    note('Elegí el riesgo y las filas, y soltá la bolita 🔴');
+    note('Elegí el riesgo y las filas, y soltá la bolita\u00a0🔴');
     render();
   }
 
@@ -932,12 +937,11 @@ export function createPlinko(shell) {
     vibrate([30, 40, 30, 40, 60]);
   }
 
+  /** Agrega el resultado a "últimos resultados" (el más nuevo primero). */
   function pushHistory(p) {
+    if (!el) return;
     const edge = edgeOf(p.bucket, p.params.rows);
     const col = heat(edge);
-    history.unshift({ m: p.multiplier, id: p.id });
-    if (history.length > HISTORY) history.length = HISTORY;
-    if (!el) return;
     const chip = h(
       'button',
       {

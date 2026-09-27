@@ -66,6 +66,7 @@ const bal = { server: 0, shown: 0, locks: 0, hidden: new Map(), seq: 0, anim: 0 
 function setBalance(value, animate = true) {
   if (!Number.isFinite(value)) return;
   bal.server = value;
+  if (state.user) state.user.balance = value;
   renderBalance(animate);
 }
 
@@ -276,7 +277,6 @@ function updateAuthUI() {
   const u = state.user;
   els.guestActions.hidden = !!u;
   els.userActions.hidden = !u;
-  if (u) setBalance(u.balance, false);
   const chatDisabled = !u || u.muted || (!state.settings.chat_enabled && u.role !== 'admin');
   els.chatInput.disabled = chatDisabled;
   els.chatInput.placeholder = !u
@@ -322,6 +322,7 @@ async function logout() {
 
 function onLoggedIn(user, isNew) {
   state.user = user;
+  setBalance(user.balance, false);
   updateAuthUI();
   eachGame('onUser', user);
   fire('user', user);
@@ -353,6 +354,7 @@ socket.on('init', (d) => {
   state.user = d.user;
   state.online = d.online;
   state.feed = d.feed || [];
+  if (d.user) setBalance(d.user.balance, false);
   applySettings();
   eachGame('onInit', d);
   if (userChanged) eachGame('onUser', d.user);
@@ -368,6 +370,7 @@ socket.on('balance', (d) => setBalance(d.balance));
 socket.on('me', (u) => {
   if (!state.user || u.id !== state.user.id) return;
   state.user = { ...state.user, ...u };
+  if (Number.isFinite(u.balance)) setBalance(u.balance);
   updateAuthUI();
 });
 

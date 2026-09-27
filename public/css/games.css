@@ -623,6 +623,16 @@
   transform: translateY(-2px);
 }
 
+.mini-plinko .mp-buckets {
+  gap: 2px;
+}
+
+.mini-plinko .mp-buckets span {
+  font-size: clamp(0.45rem, 2.1vw, 0.62rem);
+  letter-spacing: -0.03em;
+  overflow: hidden;
+}
+
 .mp-buckets .hot {
   background: #ff3b4e;
   color: #fff;

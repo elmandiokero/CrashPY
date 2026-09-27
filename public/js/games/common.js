@@ -366,9 +366,11 @@ export async function loadPlays(shell, container, game) {
 }
 
 export function playRow(shell, p, onclick) {
-  const won = p.status === 'won';
-  const badge = h('span', { class: `mr-badge ${won ? multClass(p.multiplier) : 'red'}` }, won ? fmtMult(p.multiplier) : GAME_BY_ID[p.game].icon);
-  const result = won ? h('span', { class: 'green' }, fmtSigned(p.payout - p.amount)) : h('span', { class: 'red' }, fmtSigned(-p.amount));
+  // En Plinko se puede cobrar menos de lo apostado (ej. 0.49x): eso es una pérdida, no una ganancia
+  const net = p.payout - p.amount;
+  const back = p.payout > 0;
+  const badge = h('span', { class: `mr-badge ${back ? (net > 0 ? multClass(p.multiplier) : 'muted') : 'red'}` }, back ? fmtMult(p.multiplier) : GAME_BY_ID[p.game].icon);
+  const result = h('span', { class: net > 0 ? 'green' : net < 0 ? 'red' : 'muted' }, fmtSigned(net));
   return h(
     'div',
     { class: 'mine-row', style: { cursor: 'pointer' }, onclick: onclick || (() => openPlay(shell, p.id)) },
