@@ -149,6 +149,13 @@ La ronda queda marcada como **anulada** en el historial público junto con su ha
   👉 **Copiá la carpeta `data` a un pendrive o a la nube de vez en cuando.** Ahí está todo: usuarios, saldos, apuestas y comprobantes.
 - No compartas la carpeta `data` ni el archivo `.env`.
 
+## ⏰ Para tenerlo abierto 24/7
+
+- En Windows: *Configuración → Sistema → Inicio/apagado y suspensión* → **Suspender: Nunca** (si la PC se duerme, el juego se corta).
+- Usá la **opción B** del túnel (queda como servicio y arranca solo con Windows).
+- Para que CrashPY también arranque solo: tocá `Win + R`, escribí `shell:startup` y poné ahí un **acceso directo a `INICIAR.bat`**.
+- Si podés, conectá la PC por cable y con una UPS. Si igual se corta la luz en medio de una ronda, al volver se devuelven las apuestas de esa ronda.
+
 ## 🧰 Problemas comunes
 
 | Problema | Solución |

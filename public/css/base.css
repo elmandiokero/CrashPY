@@ -536,6 +536,7 @@ textarea.input {
 .modal {
   width: 100%;
   max-width: 440px;
+  max-height: calc(100vh - 32px);
   max-height: calc(100dvh - 32px);
   overflow: auto;
   background: linear-gradient(180deg, var(--panel-2), var(--panel));
@@ -608,6 +609,7 @@ textarea.input {
   .modal-wide {
     max-width: none;
     border-radius: 22px 22px 0 0;
+    max-height: 94vh;
     max-height: 94dvh;
     padding-bottom: env(safe-area-inset-bottom);
   }

@@ -399,6 +399,8 @@ class BetPanel {
         setBalance(res.balance);
         this.onServerBet(res.bet);
       } else {
+        // Si el retiro automático ya cobró en el mismo instante, no mostramos error
+        if (this.status === 'won') return;
         if (this.status === 'cashing') this.status = state.phase === 'RUNNING' && this.bet && this.bet.status === 'active' ? 'active' : 'idle';
         toast(res.error || 'No se pudo retirar', 'error');
         this.render();

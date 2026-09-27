@@ -219,6 +219,7 @@ body {
   .chat-col {
     position: sticky;
     top: 70px;
+    height: calc(100vh - 84px);
     height: calc(100dvh - 84px);
   }
 
@@ -237,6 +238,7 @@ body {
   .side-col {
     position: sticky;
     top: 70px;
+    height: calc(100vh - 84px);
     height: calc(100dvh - 84px);
   }
 }
@@ -1445,6 +1447,7 @@ body.chat-open .chat-fab {
     left: 0;
     right: 0;
     bottom: 0;
+    height: 64vh;
     height: min(64dvh, 560px);
     z-index: 80;
     border-radius: 22px 22px 0 0;
