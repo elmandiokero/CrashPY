@@ -1,16 +1,17 @@
-/* ═══════════════ 🎰 Ruleta ═══════════════ */
+/* ═══════════════ 🎰 Ruleta en vivo ═══════════════ */
 
-/* Distribución: escenario (rueda) + mesa + panel.
-   PC/tablet (.rl-wide): panel | rueda arriba y la mesa horizontal abajo, a todo el ancho.
-   Celular (.rl-narrow): rueda, mesa vertical con barra fija de fichas + GIRAR, y el panel. */
+/* Distribución: escenario (rueda) + mesa + panel + apuestas de la ronda.
+   PC/tablet (.rl-wide): panel | rueda arriba, la mesa horizontal abajo y las apuestas de todos al final.
+   Celular (.rl-narrow): rueda, mesa vertical con barra fija de fichas + APOSTAR, el panel y las apuestas.
+   Las clases rn-* (bolitas del historial) son compartidas: acá no se tocan. */
 .gv.gv-roulette {
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'stage' 'board' 'panel';
+  grid-template-areas: 'stage' 'board' 'panel' 'bets';
 }
 
 .gv.gv-roulette.rl-wide {
   grid-template-columns: 272px minmax(0, 1fr);
-  grid-template-areas: 'panel stage' 'board board';
+  grid-template-areas: 'panel stage' 'board board' 'bets bets';
   align-items: stretch;
 }
 
@@ -51,21 +52,25 @@
   padding: 5px 6px;
 }
 
-/* Siempre dos renglones de nota: así el panel no cambia de alto (y la mesa no salta) al girar */
+/* Siempre dos renglones de nota: así el panel no cambia de alto (y la mesa no salta) */
 .gv-roulette.rl-wide .rl-panel .gv-note {
   min-height: 2.5em;
   display: grid;
   align-items: center;
 }
 
-/* ───────── Escenario: historial + rueda ───────── */
+.rl-panel .gv-note.warn {
+  color: #ffd75e;
+}
+
+/* ───────── Escenario: historial, cuenta regresiva y rueda ───────── */
 .rl-stage {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 12px 14px 16px;
   background:
-    radial-gradient(52% 48% at 50% 57%, rgba(255, 176, 80, 0.14), transparent 72%),
+    radial-gradient(52% 48% at 50% 60%, rgba(255, 176, 80, 0.14), transparent 72%),
     radial-gradient(120% 90% at 50% 0%, rgba(61, 123, 255, 0.13), transparent 60%),
     linear-gradient(180deg, #0b1028, #070a1a);
 }
@@ -75,12 +80,19 @@
   padding: 10px 10px 12px;
 }
 
+/* En pantallas altas la rueda crece (el escenario deja de depender solo del alto del panel),
+   siempre dejando lugar para que la mesa entre entera sin bajar */
+.rl-wide .rl-stage {
+  min-height: clamp(0px, calc(100vh - 480px), 560px);
+  min-height: clamp(0px, calc(100svh - 480px), 560px);
+}
+
 .rl-top {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 36px;
+  min-height: 34px;
 }
 
 .rl-top-label {
@@ -103,8 +115,8 @@
   min-width: 0;
   overflow: hidden;
   /* el aire deja ver el brillo del último número sin recortarlo */
-  padding: 9px 8px;
-  margin: -9px -8px -9px -8px;
+  padding: 8px 8px;
+  margin: -8px -8px;
   mask-image: linear-gradient(90deg, #000 86%, transparent);
   -webkit-mask-image: linear-gradient(90deg, #000 86%, transparent);
 }
@@ -122,43 +134,44 @@
   text-overflow: ellipsis;
 }
 
-.rl-hn {
+/* Cada número del historial es un botón que abre la ronda (la bolita adentro es compartida) */
+.rl-hbtn {
   flex: none;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: #fff;
-  font-variant-numeric: tabular-nums;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
-  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease, filter 0.15s ease;
 }
 
-.rl-hn.rl-red {
-  background: linear-gradient(180deg, #ee3a4c, #b8162b);
+@media (hover: hover) {
+  .rl-hbtn:hover {
+    filter: brightness(1.2);
+    transform: translateY(-1px);
+  }
+
+  .rl-hbtn.rl-last:hover {
+    transform: scale(1.14) translateY(-1px);
+  }
 }
 
-.rl-hn.rl-black {
-  background: linear-gradient(180deg, #3a3f58, #171a28);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 -2px 0 rgba(0, 0, 0, 0.25);
+.rl-hbtn:focus-visible {
+  outline: 2px solid #ffd75e;
+  outline-offset: 2px;
 }
 
-.rl-hn.rl-green {
-  background: linear-gradient(180deg, #22c26f, #0b7d41);
+.rl-hbtn.rl-last {
+  margin: 0 5px 0 3px;
+  transform: scale(1.14);
+  box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.32);
 }
 
-.rl-hn.rl-last {
-  width: 30px;
-  height: 30px;
-  margin: 0 3px 0 2px;
-  font-size: 0.84rem;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92), 0 0 8px rgba(255, 255, 255, 0.28), inset 0 -2px 0 rgba(0, 0, 0, 0.25);
-}
-
-.rl-hn.rl-new {
+.rl-hbtn.rl-new {
   animation: rlPop 0.5s cubic-bezier(0.2, 1.5, 0.4, 1);
 }
 
@@ -169,8 +182,174 @@
   }
 }
 
+/* Cuenta regresiva / estado de la ronda (alto fijo: no salta nada al cambiar de fase) */
+.rl-status {
+  position: relative;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 7px 12px 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.rl-st-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 26px;
+}
+
+.rl-st-msg {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 26px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rl-st-ball {
+  display: inline-block;
+  margin: -3px 8px 0 0;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* Si el cartel es angosto (PC chica: la rueda al lado del panel) solo queda lo principal */
+@container (max-width: 300px) {
+  .rl-st-aside {
+    display: none;
+  }
+}
+
+.rl-st-aside {
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.rl-st-secs {
+  flex: none;
+  min-width: 2.4em;
+  text-align: right;
+  font-size: 1.2rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.rl-st-secs:empty {
+  display: none;
+}
+
+.rl-st-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.rl-st-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1fbd69, #ffd75e);
+  transform-origin: left center;
+}
+
+.rl-status:not(.m-bet):not(.m-result) .rl-st-bar {
+  visibility: hidden;
+}
+
+/* Con el resultado, la barra es el tiempo que falta para la próxima ronda */
+.rl-status.m-result .rl-st-bar i {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Apuestas abiertas: puntito verde "en vivo" */
+.rl-status.m-bet .rl-st-msg::before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin: -2px 8px 0 1px;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: #2ee07b;
+  box-shadow: 0 0 8px rgba(46, 224, 123, 0.8);
+  animation: rlLive 1.2s ease-in-out infinite;
+}
+
+@keyframes rlLive {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+.rl-status.hurry {
+  border-color: rgba(255, 138, 61, 0.55);
+  background: rgba(255, 138, 61, 0.1);
+}
+
+.rl-status.hurry .rl-st-secs {
+  color: #ffb347;
+  text-shadow: 0 0 14px rgba(255, 160, 60, 0.6);
+}
+
+.rl-status.hurry .rl-st-bar i {
+  background: linear-gradient(90deg, #ff6a3d, #ffc53d);
+}
+
+.rl-status.m-closing .rl-st-msg,
+.rl-status.m-spin .rl-st-msg {
+  color: var(--gold);
+}
+
+.rl-status.m-spin .rl-st-msg {
+  animation: rlSpinMsg 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes rlSpinMsg {
+  to {
+    text-shadow: 0 0 18px rgba(255, 197, 61, 0.7);
+  }
+}
+
+.rl-status.m-pause .rl-st-msg,
+.rl-status.m-wait .rl-st-msg {
+  color: var(--muted);
+}
+
+.rl-status.m-result.rl-res-red {
+  border-color: rgba(236, 58, 77, 0.5);
+  background: linear-gradient(90deg, rgba(236, 58, 77, 0.24), rgba(236, 58, 77, 0.04));
+}
+
+.rl-status.m-result.rl-res-black {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(90deg, rgba(120, 130, 175, 0.22), rgba(255, 255, 255, 0.03));
+}
+
+.rl-status.m-result.rl-res-green {
+  border-color: rgba(31, 189, 105, 0.55);
+  background: linear-gradient(90deg, rgba(31, 189, 105, 0.26), rgba(31, 189, 105, 0.04));
+}
+
 /* Rueda */
 .rl-wheel-wrap {
+  position: relative;
   flex: 1;
   display: grid;
   place-items: center;
@@ -194,8 +373,8 @@
 }
 
 .rl-narrow .rl-wheel {
-  width: min(100%, 262px, 34vh);
-  width: min(100%, 262px, 34svh);
+  width: min(100%, 244px, 30vh);
+  width: min(100%, 244px, 30svh);
 }
 
 .rl-wl-layer,
@@ -242,12 +421,46 @@
   }
 }
 
-/* El premio flotante sale debajo del cartel de resultado (que va en el centro de la rueda) */
+/* El premio grande sube desde abajo del escenario, debajo del cartel del resultado (centro de la rueda) */
 .rl-stage .win-pop {
-  top: 70%;
+  top: auto;
+  bottom: 10px;
+  animation-name: rlWinPop;
 }
 
-.rl-ball {
+/* Como el de todos los juegos, pero casi sin subir: así no se mete debajo del cartel */
+@keyframes rlWinPop {
+  0% {
+    transform: translate(-50%, 24px) scale(0.5);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(-50%, 0) scale(1.1);
+    opacity: 1;
+  }
+  25% {
+    transform: translate(-50%, 0) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -8px) scale(1);
+    opacity: 0;
+  }
+}
+
+.rl-stage .win-pop .wp-amount {
+  font-size: clamp(1.6rem, 7cqw, 2.2rem);
+  line-height: 1.15;
+}
+
+.rl-stage .win-pop .wp-label {
+  margin-top: 2px;
+  font-size: 0.78rem;
+}
+
+.rl-wl-ball {
   position: absolute;
   left: 0;
   top: 0;
@@ -460,7 +673,7 @@
   }
 }
 
-/* Ficha apostada sobre la casilla */
+/* Ficha sobre la casilla: sólida = confirmada; con anillo punteado que gira = sin confirmar */
 .rl-bet {
   --sz: 30px;
   position: absolute;
@@ -512,6 +725,31 @@
   font-size: 0.48rem;
 }
 
+.rl-bet.rl-pend {
+  opacity: 0.8;
+  filter: saturate(0.75);
+  box-shadow: 0 0 0 1.5px var(--c, #e5303f), 0 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+.rl-bet.rl-pend::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px dashed #ffd75e;
+  animation: rlPendRing 6s linear infinite;
+}
+
+.rl-narrow .rl-bet.rl-pend::after {
+  inset: -5px;
+}
+
+@keyframes rlPendRing {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .rl-bet.rl-pop {
   animation: rlChipIn 0.3s cubic-bezier(0.2, 1.6, 0.4, 1);
 }
@@ -523,6 +761,89 @@
   }
 }
 
+/* Fichas sin confirmar sumadas a una apuesta ya confirmada: "+5K" en la esquina */
+.rl-plus {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  z-index: 4;
+  padding: 2px 5px;
+  border-radius: 999px;
+  border: 1px dashed #ffd75e;
+  background: rgba(24, 19, 2, 0.9);
+  color: #ffd75e;
+  font-size: 0.56rem;
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-shadow: none;
+  white-space: nowrap;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.rl-plus.rl-pop {
+  animation: rlChipIn 0.3s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+/* Cuántos jugadores apostaron en la casilla (en vivo) */
+.rl-crowd {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 13px;
+  padding: 0 4px 0 3px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #dfffe9;
+  font-size: 0.52rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  text-shadow: none;
+  pointer-events: none;
+}
+
+.rl-crowd::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #2ee07b;
+}
+
+.rl-narrow .rl-crowd {
+  top: 2px;
+  left: 2px;
+  height: 12px;
+}
+
+/* Mesa horizontal chica (casillas angostas): solo el puntito, sin el número (queda en el título) */
+.rl-wide.rl-tight .rl-crowd {
+  justify-content: center;
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  font-size: 0;
+}
+
+/* El 0 tiene el borde redondeado: la marca va donde la casilla es recta */
+.rl-cell.rl-green .rl-crowd {
+  top: 4px;
+  left: auto;
+  right: 4px;
+}
+
+.rl-narrow .rl-cell.rl-green .rl-crowd {
+  top: auto;
+  bottom: 3px;
+  right: 5px;
+}
+
 /* Resultado en la mesa */
 .rl-table.rl-result .rl-cell.rl-num:not(.rl-hit) {
   filter: saturate(0.55) brightness(0.62);
@@ -530,6 +851,10 @@
 
 .rl-table.rl-result .rl-cell:not(.rl-num):not(.rl-won):not(.rl-area) {
   filter: brightness(0.78);
+}
+
+.rl-table.rl-result .rl-crowd {
+  opacity: 0.35;
 }
 
 .rl-cell.rl-hit {
@@ -551,7 +876,7 @@
   box-shadow: 0 0 0 2px #ffd75e, 0 0 18px rgba(255, 197, 61, 0.6);
 }
 
-.rl-cell.rl-won .rl-bet {
+.rl-cell.rl-won .rl-bet:not(.rl-pend) {
   box-shadow: 0 0 0 1.5px var(--c), 0 0 0 3.5px #ffe08a, 0 0 18px rgba(255, 197, 61, 0.95);
   animation: rlChipWin 0.8s ease-in-out infinite alternate;
 }
@@ -562,7 +887,7 @@
   }
 }
 
-.rl-cell.rl-lost .rl-bet {
+.rl-cell.rl-lost .rl-bet:not(.rl-pend) {
   opacity: 0.35;
   filter: grayscale(0.85);
   transform: scale(0.86);
@@ -667,7 +992,7 @@
 .rl-wide .rl-tool {
   flex-direction: column;
   gap: 3px;
-  height: 48px;
+  height: 44px;
   padding: 0 2px;
   font-size: 0.64rem;
 }
@@ -736,7 +1061,7 @@
   display: none;
 }
 
-/* Total apostado / premio máximo */
+/* Mi apuesta en la ronda / premio posible */
 .rl-sums {
   display: grid;
   gap: 1px;
@@ -748,24 +1073,28 @@
 
 .rl-sums > div {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
-  padding: 8px 11px;
+  min-height: 36px;
+  padding: 5px 11px;
   background: rgba(6, 9, 19, 0.6);
 }
 
+/* El nombre puede ir en dos renglones (en la PC el panel es angosto): el monto nunca se corta */
 .rl-sums span {
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 700;
+  line-height: 1.25;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  white-space: nowrap;
+  min-width: 0;
 }
 
 .rl-sums b {
+  flex: none;
   min-width: 0;
   font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
@@ -774,7 +1103,24 @@
   text-overflow: ellipsis;
 }
 
-/* ───────── Barra fija del celular: fichas + GIRAR ───────── */
+/* Mi apuesta: el monto confirmado y, abajo a todo el ancho, lo que falta confirmar */
+.rl-sums > .rl-sum-mine {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1px 8px;
+}
+
+.rl-sum-pend {
+  grid-column: 1 / -1;
+  justify-self: end;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #ffd75e;
+  white-space: nowrap;
+}
+
+/* ───────── Barra fija del celular: fichas + APOSTAR ───────── */
 .rl-dock {
   display: none;
 }
@@ -792,6 +1138,35 @@
   border-top: 1px solid rgba(255, 255, 255, 0.14);
   background: linear-gradient(180deg, rgba(21, 28, 60, 0.97), rgba(8, 11, 27, 0.99));
   box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.45);
+}
+
+/* Cuenta regresiva en el borde de arriba de la barra */
+.rl-dock-bar {
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.rl-dock.rl-open .rl-dock-bar {
+  opacity: 1;
+}
+
+.rl-dock-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #1fbd69, #ffd75e);
+  transform-origin: left center;
+}
+
+.rl-dock.hurry .rl-dock-bar i {
+  background: linear-gradient(90deg, #ff6a3d, #ffc53d);
 }
 
 .rl-dock-row {
@@ -830,6 +1205,50 @@
   border-radius: 15px;
 }
 
+/* Segundos que quedan para apostar, al lado de APOSTAR */
+.rl-dock-time {
+  display: none;
+}
+
+.rl-dock.rl-open .rl-dock-time {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 54px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  line-height: 1;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.rl-dock-time b {
+  font-size: 1.3rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.rl-dock-time small {
+  margin-top: 3px;
+  font-size: 0.56rem;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rl-dock.hurry .rl-dock-time {
+  border-color: rgba(255, 138, 61, 0.7);
+  background: rgba(255, 138, 61, 0.15);
+}
+
+.rl-dock.hurry .rl-dock-time b {
+  color: #ffb347;
+}
+
 /* Lugar para el botón flotante del chat (abajo a la derecha) */
 @media (max-width: 859px) {
   .rl-dock-go {
@@ -837,13 +1256,248 @@
   }
 }
 
+/* ───────── Apuestas de la ronda (en vivo) ───────── */
+.rl-live {
+  grid-area: bets;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid var(--line-2);
+  background: linear-gradient(180deg, rgba(30, 39, 80, 0.45), rgba(16, 22, 47, 0.88));
+}
+
+.rl-narrow .rl-live {
+  padding: 10px;
+}
+
+.rl-live-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+  padding: 0 2px;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.rl-live-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rl-live-sum b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.rl-live-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  align-content: start;
+  gap: 4px 8px;
+  max-height: 336px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.rl-lr {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 5px 9px 5px 7px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.8rem;
+  transition: opacity 0.35s ease;
+}
+
+.rl-lr-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.25;
+}
+
+.rl-lr-name {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.rl-lr-name > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rl-lr-bets {
+  font-size: 0.7rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rl-lr-amt {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rl-lr-you {
+  flex: none;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  color: #d4e2ff;
+  background: rgba(61, 123, 255, 0.28);
+}
+
+.rl-lr.me {
+  background: rgba(61, 123, 255, 0.15);
+  box-shadow: inset 2px 0 0 var(--blue);
+}
+
+/* Bots de la sala: siempre marcados y un poco más apagados que los jugadores */
+.rl-lr.bot {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.rl-lr.bot .rl-lr-name > span:first-child {
+  color: #aab2d8;
+  font-weight: 500;
+}
+
+.rl-lr.bot .bot-avatar {
+  filter: grayscale(0.75);
+  opacity: 0.7;
+}
+
+.rl-lr.won .rl-lr-amt {
+  color: #5ff29a;
+}
+
+.rl-lr.lost {
+  opacity: 0.5;
+}
+
+.rl-lr.lost .rl-lr-amt {
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+}
+
+.rl-lr.fresh {
+  animation: rlRowIn 0.6s ease-out;
+}
+
+@keyframes rlRowIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+    background: rgba(255, 215, 94, 0.2);
+  }
+}
+
+.rl-live-more,
+.rl-live-empty {
+  grid-column: 1 / -1;
+  padding: 12px 4px;
+  text-align: center;
+  font-size: 0.76rem;
+  color: var(--faint);
+}
+
+.rl-live-more {
+  padding: 4px;
+}
+
+/* Últimas rondas: colores y números calientes / fríos */
+.rl-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 2px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.rl-sx-label {
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rl-sx-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rl-sx-tag {
+  margin-right: 2px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rl-sx-pct {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 6px;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.rl-sx-pct i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.rl-sx-pct.rl-red i {
+  background: #e32a3f;
+}
+
+.rl-sx-pct.rl-black i {
+  background: #22263a;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+.rl-sx-pct.rl-green i {
+  background: #14a150;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .rl-hn.rl-new,
+  .rl-hbtn.rl-new,
   .rl-bet.rl-pop,
+  .rl-plus.rl-pop,
+  .rl-bet.rl-pend::after,
   .rl-cell.rl-hit,
   .rl-cell.rl-won .rl-bet,
   .rl-cell.rl-nope,
-  .rl-wl-glow.on i {
+  .rl-wl-glow.on i,
+  .rl-status.m-bet .rl-st-msg::before,
+  .rl-status.m-spin .rl-st-msg,
+  .rl-lr.fresh {
     animation: none !important;
   }
 
