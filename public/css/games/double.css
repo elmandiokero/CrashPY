@@ -76,7 +76,48 @@
 
 .db-stage .win-pop {
   top: auto;
-  bottom: 6px;
+  bottom: 8px;
+  animation-name: dbWinPop;
+}
+
+.db-stage .win-pop .wp-amount {
+  font-size: clamp(1.6rem, 7cqw, 2.2rem);
+  line-height: 1.15;
+}
+
+.db-stage .win-pop .wp-label {
+  margin-top: 2px;
+  font-size: 0.78rem;
+}
+
+@keyframes dbWinPop {
+  0% {
+    transform: translate(-50%, 16px) scale(0.5);
+    opacity: 0;
+  }
+  14% {
+    transform: translate(-50%, 0) scale(1.08);
+    opacity: 1;
+  }
+  24% {
+    transform: translate(-50%, 0) scale(1);
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -8px) scale(1);
+    opacity: 0;
+  }
+}
+
+/* Mientras sube el premio se esconde el cartel del resultado (quedan en el mismo lugar) */
+.db-status > * {
+  transition: opacity 0.2s ease;
+}
+
+.db-status.celebrating > * {
+  opacity: 0;
 }
 
 .db-glow {
@@ -764,6 +805,12 @@
   outline-offset: 2px;
 }
 
+.db-cb:focus-visible,
+.db-hist:focus-visible {
+  outline: 2px solid #8fb2ff;
+  outline-offset: 2px;
+}
+
 .db-cb.pending {
   animation: dbPending 0.45s ease-in-out infinite alternate;
 }
@@ -859,19 +906,20 @@
     min-height: 54px;
     flex-direction: row;
     justify-content: space-between;
-    gap: 10px;
-    padding: 8px 14px;
+    gap: 8px;
+    padding: 8px 10px 8px 14px;
   }
 
   .db-cb-main {
+    flex: none;
     flex-direction: row;
     align-items: baseline;
-    gap: 7px;
+    gap: 6px;
   }
 
   .db-cb-name {
-    font-size: 0.98rem;
-    letter-spacing: 0.04em;
+    font-size: 0.92rem;
+    letter-spacing: 0.03em;
   }
 
   .db-cb-sep {
@@ -881,12 +929,17 @@
   }
 
   .db-cb-mult {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
   }
 
   .db-cb-mine {
     align-items: flex-end;
     min-width: 0;
+    padding: 3px 7px;
+  }
+
+  .db-cb-mine b {
+    font-size: 0.72rem;
   }
 }
 

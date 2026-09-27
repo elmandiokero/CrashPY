@@ -251,6 +251,8 @@ export function createDouble(shell) {
     markWinner();
     renderBanner(false);
     el.glow.classList.remove('on');
+    clearTimeout(el.celebrateTimer);
+    el.status.classList.remove('celebrating');
   }
 
   // ───────────────────────── Eventos del servidor ─────────────────────────
@@ -398,23 +400,27 @@ export function createDouble(shell) {
     const color = d.color || core.doubleColor(d.result);
     const net = d.payout - d.bet;
     const here = !!el && visible();
-    if (d.payout > 0) {
+    if (d.payout > 0 && net > 0) {
       const pays = PAYS[color];
       const big = isBigWin(d.payout, d.bet, pays);
-      resultNote = {
-        roundId: d.roundId,
-        kind: 'good',
-        text: net > 0 ? `✅ Ganaste ${fmtGs(d.payout)} con el ${color === 'white' ? 'BLANCO' : NAME[color].toLowerCase()}` : `Recuperaste ${fmtGs(d.payout)}`,
-      };
+      resultNote = { roundId: d.roundId, kind: 'good', text: `✅ Ganaste ${fmtGs(d.payout)} con el ${color === 'white' ? 'BLANCO' : NAME[color].toLowerCase()}` };
       if (here) {
         el.result.show({ win: true, head: fmtMult(pays), detail: `Ganaste ${fmtGs(d.payout)}`, big });
-        if (net > 0) winPop(el.winLayer, { amount: net, label: color === 'white' ? '¡Salió BLANCO! ⭐' : `¡Salió ${NAME[color]}! 🎉`, big });
+        // El premio aparece donde está el cartel del resultado: lo escondemos mientras tanto
+        winPop(el.winLayer, { amount: net, label: color === 'white' ? '¡Salió BLANCO! ⭐' : `¡Salió ${NAME[color]}! 🎉`, big });
+        el.status.classList.add('celebrating');
+        clearTimeout(el.celebrateTimer);
+        el.celebrateTimer = setTimeout(() => el.status.classList.remove('celebrating'), 2300);
         if (big) confetti(el.stage, { colors: color === 'white' ? ['#ffffff', '#f12c4c', '#ffc53d', '#ffe38a'] : ['#f12c4c', '#ffffff', '#ffc53d', '#3d7bff'] });
         sound.win(big);
         vibrate(big ? [30, 40, 30, 40, 60] : [25, 30, 25]);
       } else {
         toast(`Salió ${NAME[color].toLowerCase()}: ganaste ${fmtGs(d.payout)}`, 'win', '🎡 Double');
       }
+    } else if (d.payout > 0) {
+      // Apostó a más de un color y lo cobrado no supera lo apostado
+      resultNote = { roundId: d.roundId, kind: '', text: net === 0 ? `Recuperaste lo apostado (${fmtGs(d.payout)})` : `Cobraste ${fmtGs(d.payout)} · en total ${fmtSigned(net)}` };
+      if (here) sound.coin();
     } else {
       resultNote = { roundId: d.roundId, kind: 'bad', text: `Perdiste ${fmtGs(d.bet)} · salió ${NAME[color].toLowerCase()}` };
       if (here) sound.lose();
@@ -721,7 +727,7 @@ export function createDouble(shell) {
     if (pausedView()) text = '⏸ El Double está en pausa por un momento';
     else if (resultNote && resultNote.roundId === st.roundId && shown) ({ text, kind } = resultNote);
     else if (!shell.state.user) text = 'Ingresá para apostar 🎯';
-    else if (canBet()) text = total ? `✓ Apostaste ${fmtGs(total)} · tocá de nuevo para sumar` : 'Apostá antes de que gire ⏳';
+    else if (canBet()) text = total ? '✓ ¡Listo! Tocá de nuevo para sumar' : 'Apostá antes de que gire ⏳';
     else if (spinning() || (st.phase === 'SPINNING' && total)) text = total ? '🍀 ¡Suerte! Tu apuesta está en juego' : 'Apuestas cerradas · esperá la próxima ronda';
     else if (shown || st.phase === 'RESULT') text = 'Apostá en la próxima ronda 🎯';
     else if (st.phase === 'BETTING') text = 'Apuestas cerradas';
@@ -818,7 +824,8 @@ export function createDouble(shell) {
     if (last100 || last100Loading) return;
     last100Loading = true;
     try {
-      const { items } = await api('/api/double/rounds?limit=100');
+      // Pedimos unas de más: las rondas anuladas (que no se jugaron) no cuentan
+      const { items } = await api('/api/double/rounds?limit=120');
       const list = items.filter((r) => r.status === 'ended').map((r) => ({ id: r.id, result: r.result }));
       // Rondas que terminaron mientras cargaba (o que la cinta ya mostró)
       for (const r of st.history.slice().reverse()) if (!list.length || r.id > list[0].id) list.unshift(r);
