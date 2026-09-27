@@ -664,8 +664,13 @@
   gap: 3px;
   height: 48px;
   padding: 0 2px;
-  font-size: 0.66rem;
-  letter-spacing: 0.01em;
+  font-size: 0.64rem;
+}
+
+.rl-tool-tx {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rl-tool {
