@@ -1,73 +1,27 @@
-import {
-  $,
-  $$,
-  h,
-  api,
-  fmtGs,
-  fmtNum,
-  fmtMult,
-  fmtSigned,
-  parseAmount,
-  parseMult,
-  fmtDate,
-  fmtTime,
-  multClass,
-  colorFor,
-  multiplierAt,
-  msForMultiplier,
-  toast,
-  openModal,
-  copyText,
-  sha256Hex,
-  crashFromHash,
-} from './shared.js';
-import { CrashGraph } from './graph.js';
+// CrashPY · aplicación del jugador: sesión, saldo, billetera, chat, menú y los juegos.
+import { $, $$, h, api, fmtGs, fmtNum, fmtMult, fmtSigned, parseAmount, fmtDate, fmtTime, multClass, colorFor, toast, openModal, copyText } from './shared.js';
 import { Sound } from './sound.js';
+import { GAMES, GAME_BY_ID, SEED_GAMES, store, vibrate, avatar, openPlay, openFairness, openDoubleRound } from './games/common.js';
+import { createCrash } from './games/crash.js';
+import { createMines } from './games/mines.js';
+import { createPenalty } from './games/penalty.js';
+import { createDouble } from './games/double.js';
+import { createPlinko } from './games/plinko.js';
+import { createRoulette } from './games/roulette.js';
 
 // ═══════════════ Estado ═══════════════
 
-const store = {
-  get(key, def = null) {
-    try {
-      const v = localStorage.getItem(key);
-      return v === null ? def : JSON.parse(v);
-    } catch {
-      return def;
-    }
-  },
-  set(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      /* modo privado */
-    }
-  },
-};
-
 const state = {
   user: null,
-  balance: 0,
-  settings: { min_bet: 1000, max_bet: 1000000, quick_amounts: '2000,5000,10000,50000', chat_enabled: true },
+  settings: { min_bet: 1000, max_bet: 1000000, max_profit: 20000000, quick_amounts: '2000,5000,10000,50000', chat_enabled: true },
   fair: null,
   connected: false,
-  phase: 'CONNECTING',
-  paused: false,
-  roundId: null,
-  growth: 0.00006,
-  startLocal: 0,
-  bettingEndsLocal: 0,
-  bettingMs: 7000,
-  nextLocal: 0,
-  crash: null,
-  crashElapsed: 0,
-  launchUntil: 0,
-  bets: new Map(),
-  betsDirty: true,
-  history: [],
   online: { n: 0, users: 0 },
   unread: 0,
   sideTab: 'bets',
   topPeriod: 'day',
+  feed: [],
+  lastInit: null,
 };
 
 const els = {
@@ -76,24 +30,12 @@ const els = {
   guestActions: $('#guestActions'),
   userActions: $('#userActions'),
   onlineCount: $('#onlineCount'),
-  historyList: $('#historyList'),
-  stage: $('#stage'),
-  stageStatus: $('#stageStatus'),
-  stageMult: $('#stageMult'),
-  stageSub: $('#stageSub'),
-  countdown: $('#countdown'),
-  countdownBar: $('#countdownBar'),
-  roundLabel: $('#roundLabel'),
-  roundPlayers: $('#roundPlayers'),
-  roundTotal: $('#roundTotal'),
-  stageFlash: $('#stageFlash'),
-  winLayer: $('#winLayer'),
-  betPanels: $('#betPanels'),
-  addPanel: $('#btnAddPanel'),
+  gameNav: $('#gameNav'),
+  sideCol: $('#sideCol'),
+  crashLive: $('#crashLive'),
+  feedLive: $('#feedLive'),
+  feedList: $('#feedList'),
   betsCount: $('#betsCount'),
-  betsPlayers: $('#betsPlayers'),
-  betsTotal: $('#betsTotal'),
-  betsList: $('#betsList'),
   mineList: $('#mineList'),
   topList: $('#topList'),
   chat: $('#chat'),
@@ -113,475 +55,31 @@ const els = {
 };
 
 const sound = new Sound();
-const graph = new CrashGraph($('#graph'));
 const socket = io();
 
-const vibrate = (pattern) => {
-  try {
-    if (navigator.vibrate) navigator.vibrate(pattern);
-  } catch {
-    /* sin soporte */
-  }
-};
-
-function setText(el, text) {
-  if (el._t !== text) {
-    el._t = text;
-    el.textContent = text;
-  }
-}
-
-function setClass(el, cls) {
-  if (el._c !== cls) {
-    el._c = cls;
-    el.className = cls;
-  }
-}
-
-function avatar(name, size) {
-  const style = { background: colorFor(name) };
-  if (size) Object.assign(style, { width: size + 'px', height: size + 'px', fontSize: size * 0.4 + 'px' });
-  return h('span', { class: 'avatar', style }, String(name || '?').slice(0, 1));
-}
-
-function compact(n) {
-  if (n >= 1e6) return (n / 1e6).toFixed(n % 1e6 === 0 ? 0 : 1).replace('.', ',') + 'M';
-  if (n >= 1e3) return (n / 1e3).toFixed(n % 1e3 === 0 ? 0 : 1).replace('.', ',') + 'K';
-  return String(n);
-}
-
-function stepFor(v) {
-  if (v < 10000) return 1000;
-  if (v < 50000) return 5000;
-  if (v < 200000) return 10000;
-  if (v < 1000000) return 50000;
-  return 100000;
-}
-
-// ═══════════════ Paneles de apuesta ═══════════════
-
-class BetPanel {
-  constructor(slot) {
-    this.slot = slot;
-    const node = $('#tplBetPanel').content.firstElementChild.cloneNode(true);
-    node.dataset.slot = String(slot);
-    this.el = node;
-    this.input = $('.amount-input', node);
-    this.btn = $('.bp-action', node);
-    this.title = $('.bp-action-title', node);
-    this.sub = $('.bp-action-sub', node);
-    this.quick = $('.quick-row', node);
-    this.autoBetEl = $('.auto-bet', node);
-    this.autoCashOnEl = $('.auto-cash-on', node);
-    this.autoCashInput = $('.auto-cash-input', node);
-    this.autoCashField = $('.auto-cash-field', node);
-    this.noteEl = $('.bp-note', node);
-
-    const saved = store.get(`cpy_panel${slot}`, {});
-    this.amount = saved.amount || (slot === 0 ? 5000 : 10000);
-    this.autoCashOn = !!saved.autoCashOn;
-    this.autoCash = saved.autoCash || 200;
-    this.autoBet = false;
-    this.status = 'idle';
-    this.bet = null;
-    this.celebrated = null;
-    this.noteTimer = null;
-
-    this.input.value = fmtNum(this.amount);
-    this.autoCashOnEl.checked = this.autoCashOn;
-    this.autoCashInput.value = (this.autoCash / 100).toFixed(2);
-    this.autoCashField.classList.toggle('off', !this.autoCashOn);
-
-    this.input.addEventListener('input', () => {
-      const v = parseAmount(this.input.value);
-      this.input.value = Number.isFinite(v) ? fmtNum(v) : '';
-      if (Number.isFinite(v)) this.amount = v;
-      this.render();
-    });
-    this.input.addEventListener('blur', () => this.setAmount(this.amount));
-    $('[data-act="minus"]', node).addEventListener('click', () => this.setAmount(this.amount - stepFor(this.amount - 1)));
-    $('[data-act="plus"]', node).addEventListener('click', () => this.setAmount(this.amount + stepFor(this.amount)));
-    this.btn.addEventListener('click', () => this.onAction());
-    this.autoCashOnEl.addEventListener('change', () => {
-      this.autoCashOn = this.autoCashOnEl.checked;
-      this.autoCashField.classList.toggle('off', !this.autoCashOn);
-      this.save();
-    });
-    this.autoCashInput.addEventListener('blur', () => {
-      let v = parseMult(this.autoCashInput.value);
-      if (!Number.isFinite(v) || v < 101) v = 101;
-      v = Math.min(v, 100000000);
-      this.autoCash = v;
-      this.autoCashInput.value = (v / 100).toFixed(2);
-      this.save();
-    });
-    this.autoCashInput.addEventListener('focus', () => {
-      if (!this.autoCashOn) {
-        this.autoCashOn = true;
-        this.autoCashOnEl.checked = true;
-        this.autoCashField.classList.remove('off');
-      }
-    });
-    this.autoBetEl.addEventListener('change', () => {
-      if (!state.user) {
-        this.autoBetEl.checked = false;
-        openAuth('login');
-        return;
-      }
-      this.autoBet = this.autoBetEl.checked;
-      if (this.autoBet) {
-        toast(`Auto apuesta activada: ${fmtGs(this.amount)} en cada ronda`, 'info');
-        if (this.status === 'idle') this.onAction();
-      }
-    });
-    node.querySelector('.bp-remove').addEventListener('click', () => setSecondPanel(false));
-    this.buildQuick();
-    this.render();
-  }
-
-  buildQuick() {
-    const list = String(state.settings.quick_amounts || '')
-      .split(',')
-      .map((v) => parseInt(v, 10))
-      .filter((v) => v > 0)
-      .slice(0, 4);
-    this.quick.replaceChildren(
-      ...list.map((v) =>
-        h('button', { type: 'button', onclick: () => this.setAmount(v), title: fmtGs(v) }, compact(v)),
-      ),
-    );
-    this.quick.style.gridTemplateColumns = `repeat(${Math.max(1, list.length)}, minmax(0, 1fr))`;
-  }
-
-  setAmount(v) {
-    const { min_bet: min, max_bet: max } = state.settings;
-    if (!Number.isFinite(v)) v = min;
-    v = Math.max(min, Math.min(max, Math.round(v)));
-    this.amount = v;
-    this.input.value = fmtNum(v);
-    this.save();
-    this.render();
-  }
-
-  save() {
-    store.set(`cpy_panel${this.slot}`, { amount: this.amount, autoCashOn: this.autoCashOn, autoCash: this.autoCash });
-  }
-
-  note(text, ms = 0) {
-    clearTimeout(this.noteTimer);
-    this.noteEl.textContent = text || '';
-    if (ms) this.noteTimer = setTimeout(() => (this.noteEl.textContent = ''), ms);
-  }
-
-  onAction() {
-    if (!state.user) {
-      openAuth('login');
-      return;
-    }
-    sound._ensure();
-    switch (this.status) {
-      case 'idle':
-        if (state.phase === 'BETTING') this.place();
-        else {
-          this.status = 'queued';
-          this.render();
-        }
-        break;
-      case 'queued':
-        this.status = 'idle';
-        if (this.autoBet) {
-          this.autoBet = false;
-          this.autoBetEl.checked = false;
-        }
-        this.render();
-        break;
-      case 'placed':
-        this.cancel();
-        break;
-      case 'active':
-        this.cashout();
-        break;
-      default:
-        break;
-    }
-  }
-
-  place() {
-    const { min_bet: min, max_bet: max } = state.settings;
-    const amount = this.amount;
-    const fail = (msg) => {
-      toast(msg, 'error');
-      if (this.autoBet) {
-        this.autoBet = false;
-        this.autoBetEl.checked = false;
-      }
-      this.status = 'idle';
-      this.render();
-    };
-    if (amount < min) return fail(`La apuesta mínima es ${fmtGs(min)}`);
-    if (amount > max) return fail(`La apuesta máxima es ${fmtGs(max)}`);
-    if (amount > state.balance) {
-      fail('No te alcanza el saldo 😕 Cargá saldo para seguir jugando');
-      return;
-    }
-    if (!socket.connected) return fail('Sin conexión, esperá un momento');
-    this.status = 'sending';
-    this.render();
-    const payload = { slot: this.slot, amount, auto: this.autoCashOn ? (this.autoCash / 100).toFixed(2) : null };
-    socket.timeout(8000).emit('bet', payload, (err, res) => {
-      if (err) {
-        if (this.status === 'sending') {
-          this.status = 'idle';
-          toast('El servidor no respondió, probá de nuevo', 'error');
-          this.render();
-        }
-        return;
-      }
-      if (res.ok) {
-        this.bet = res.bet;
-        if (this.status === 'sending' || this.status === 'idle') this.status = state.phase === 'RUNNING' ? 'active' : 'placed';
-        setBalance(res.balance);
-        sound.bet();
-        vibrate(20);
-        this.note('');
-      } else if (res.code === 'NOT_BETTING') {
-        this.status = 'queued';
-        toast('Llegaste justo tarde: tu apuesta va para la próxima ronda', 'info');
-      } else if (res.code === 'DUPLICATE') {
-        this.status = state.phase === 'RUNNING' ? 'active' : 'placed';
-      } else {
-        fail(res.error || 'No se pudo apostar');
-        return;
-      }
-      this.render();
-    });
-  }
-
-  cancel() {
-    if (!socket.connected) return toast('Sin conexión', 'error');
-    this.status = 'sending';
-    this.render();
-    socket.timeout(8000).emit('cancelBet', { slot: this.slot }, (err, res) => {
-      if (err || !res.ok) {
-        if (res && res.code === 'NOT_BETTING') {
-          this.status = 'active';
-          toast('La ronda ya despegó, no se puede cancelar', 'info');
-        } else {
-          this.status = this.bet ? 'placed' : 'idle';
-          toast((res && res.error) || 'No se pudo cancelar', 'error');
-        }
-      } else {
-        this.bet = null;
-        this.status = 'idle';
-        setBalance(res.balance);
-        sound.cancel();
-      }
-      if (this.autoBet) {
-        this.autoBet = false;
-        this.autoBetEl.checked = false;
-      }
-      this.render();
-    });
-  }
-
-  cashout() {
-    if (!socket.connected) return toast('Sin conexión', 'error');
-    this.status = 'cashing';
-    this.render();
-    socket.timeout(8000).emit('cashout', { slot: this.slot }, (err, res) => {
-      if (err) {
-        if (this.status === 'cashing') this.status = state.phase === 'RUNNING' ? 'active' : 'idle';
-        toast('El servidor no respondió', 'error');
-        this.render();
-        return;
-      }
-      if (res.ok) {
-        setBalance(res.balance);
-        this.onServerBet(res.bet);
-      } else {
-        // Si el retiro automático ya cobró en el mismo instante, no mostramos error
-        if (this.status === 'won') return;
-        if (this.status === 'cashing') this.status = state.phase === 'RUNNING' && this.bet && this.bet.status === 'active' ? 'active' : 'idle';
-        toast(res.error || 'No se pudo retirar', 'error');
-        this.render();
-      }
-    });
-  }
-
-  /** Sincroniza con el estado real de la apuesta que manda el servidor. */
-  onServerBet(b) {
-    if (!b) return;
-    if (b.roundId && state.roundId && b.roundId !== state.roundId) return;
-    switch (b.status) {
-      case 'active':
-        this.bet = b;
-        if (this.status !== 'cashing') this.status = state.phase === 'RUNNING' ? 'active' : 'placed';
-        break;
-      case 'won':
-        this.bet = b;
-        this.celebrate(b);
-        break;
-      case 'lost':
-        this.bet = null;
-        if (this.status !== 'queued') this.status = 'idle';
-        break;
-      case 'refunded':
-        this.bet = null;
-        if (this.status !== 'queued') this.status = 'idle';
-        this.note('↩ Apuesta devuelta a tu saldo', 5000);
-        break;
-      case 'cancelled':
-        this.bet = null;
-        if (this.status !== 'queued') this.status = 'idle';
-        break;
-      default:
-        break;
-    }
-    this.render();
-  }
-
-  celebrate(b) {
-    if (this.celebrated === b.id) return;
-    this.celebrated = b.id;
-    this.status = 'won';
-    const big = b.cashout >= 1000 || b.payout - b.amount >= 500000;
-    showWinPop(b.payout, b.cashout, big);
-    sound.cashout(big);
-    vibrate(big ? [30, 40, 30, 40, 60] : [25, 30, 25]);
-    if (big) graph.confetti();
-    this.note(`✅ Retiraste a ${fmtMult(b.cashout)} · ganaste ${fmtGs(b.payout - b.amount)}`, 6000);
-    this.render();
-    setTimeout(() => {
-      if (this.status === 'won') {
-        this.status = 'idle';
-        this.render();
-      }
-    }, 1800);
-  }
-
-  onBetting() {
-    if (['won', 'active', 'cashing', 'placed'].includes(this.status)) {
-      this.status = 'idle';
-      this.bet = null;
-    }
-    if (this.status === 'queued' || (this.autoBet && this.status === 'idle')) this.place();
-    this.render();
-  }
-
-  onStart() {
-    if (this.status === 'placed') this.status = 'active';
-    this.render();
-  }
-
-  onCrash(d) {
-    if ((this.status === 'active' || this.status === 'cashing') && this.bet) {
-      if (!d.cancelled) {
-        this.note(`💥 Perdiste ${fmtGs(this.bet.amount)}`, 5000);
-        els.stage.classList.remove('lost-flash');
-        void els.stage.offsetWidth;
-        els.stage.classList.add('lost-flash');
-        sound.lose();
-        vibrate(120);
-      }
-      this.status = 'idle';
-      this.bet = null;
-    }
-    this.render();
-  }
-
-  reset() {
-    this.status = 'idle';
-    this.bet = null;
-    this.autoBet = false;
-    this.autoBetEl.checked = false;
-    this.render();
-  }
-
-  render() {
-    const s = this.status;
-    const locked = s !== 'idle';
-    setClass(this.el, `bet-panel st-${s}${locked ? ' locked' : ''}`);
-    this.el.hidden = this.hidden;
-    let cls = 'bp-action';
-    let title = 'APOSTAR';
-    let sub = fmtGs(this.amount);
-    switch (s) {
-      case 'idle':
-        if (!state.user) sub = 'Ingresá para jugar';
-        break;
-      case 'queued':
-        cls += ' red';
-        title = 'CANCELAR';
-        sub = 'Esperando próxima ronda';
-        break;
-      case 'sending':
-        title = 'ENVIANDO…';
-        break;
-      case 'placed':
-        cls += ' red';
-        title = 'CANCELAR';
-        sub = fmtGs(this.bet ? this.bet.amount : this.amount);
-        break;
-      case 'active':
-      case 'cashing':
-        cls += ' orange';
-        title = s === 'cashing' ? 'RETIRANDO…' : 'RETIRAR';
-        sub = this.sub._t || fmtGs(this.bet ? this.bet.amount : this.amount);
-        break;
-      case 'won':
-        cls += ' gold';
-        title = '¡GANASTE!';
-        sub = fmtGs(this.bet ? this.bet.payout : 0);
-        break;
-      default:
-        break;
-    }
-    setClass(this.btn, cls);
-    setText(this.title, title);
-    setText(this.sub, sub);
-    this.btn.disabled = s === 'sending' || s === 'cashing' || s === 'won';
-    if (s === 'placed' && !this.noteEl.textContent) this.noteEl.textContent = '✓ Apuesta lista, esperando el despegue';
-    if (s !== 'placed' && this.noteEl.textContent === '✓ Apuesta lista, esperando el despegue') this.noteEl.textContent = '';
-  }
-
-  /** Actualiza en cada cuadro el monto que se cobraría al retirar. */
-  frame(view) {
-    if (this.status === 'active' && view.phase === 'RUNNING' && this.bet) {
-      let m = multiplierAt(view.elapsed, state.growth);
-      if (this.bet.auto && m >= this.bet.auto) m = this.bet.auto;
-      setText(this.sub, fmtGs(Math.floor((this.bet.amount * m) / 100)));
-    }
-  }
-}
-
-const panels = [new BetPanel(0), new BetPanel(1)];
-panels.forEach((p) => els.betPanels.append(p.el));
-
-function setSecondPanel(show) {
-  const p = panels[1];
-  if (!show && p.status !== 'idle' && p.status !== 'queued') {
-    toast('Tenés una apuesta en curso en ese panel', 'info');
-    return;
-  }
-  if (!show && p.status === 'queued') p.status = 'idle';
-  p.hidden = !show;
-  if (!show) p.reset();
-  p.render();
-  els.betPanels.classList.toggle('two', show);
-  els.addPanel.hidden = show;
-  store.set('cpy_two', show);
-}
-setSecondPanel(store.get('cpy_two', window.innerWidth >= 1100));
-els.addPanel.addEventListener('click', () => setSecondPanel(true));
-
 // ═══════════════ Saldo ═══════════════
+// El saldo real llega del servidor. Mientras un juego anima un resultado (la bolita del Plinko
+// cayendo, la ruleta girando…) el premio se "esconde" para no arruinar la sorpresa.
 
-let balanceAnim = 0;
+const bal = { server: 0, shown: 0, locks: 0, hidden: new Map(), seq: 0, anim: 0 };
+
 function setBalance(value, animate = true) {
   if (!Number.isFinite(value)) return;
-  const prev = state.balance;
-  state.balance = value;
-  cancelAnimationFrame(balanceAnim);
+  bal.server = value;
+  renderBalance(animate);
+}
+
+function renderBalance(animate = true) {
+  if (bal.locks > 0) return;
+  let hidden = 0;
+  for (const v of bal.hidden.values()) hidden += v;
+  showBalance(Math.max(0, bal.server - hidden), animate);
+}
+
+function showBalance(value, animate) {
+  const prev = bal.shown;
+  bal.shown = value;
+  cancelAnimationFrame(bal.anim);
   if (!animate || prev === value) {
     els.balance.textContent = fmtGs(value);
     return;
@@ -595,23 +93,177 @@ function setBalance(value, animate = true) {
     const k = Math.min(1, (now - start) / 550);
     const e = 1 - Math.pow(1 - k, 3);
     els.balance.textContent = fmtGs(prev + (value - prev) * e);
-    if (k < 1) balanceAnim = requestAnimationFrame(step);
+    if (k < 1) bal.anim = requestAnimationFrame(step);
   };
-  balanceAnim = requestAnimationFrame(step);
+  bal.anim = requestAnimationFrame(step);
 }
 
-function showWinPop(payout, cashout, big) {
-  const node = h(
-    'div',
-    { class: `win-pop${big ? ' big' : ''}` },
-    h('span', { class: 'wp-amount' }, `+${fmtGs(payout)}`),
-    h('span', { class: 'wp-label' }, `¡Retiraste a ${fmtMult(cashout)}! 🔥`),
-  );
-  els.winLayer.append(node);
-  setTimeout(() => node.remove(), 2500);
+/** Congela el saldo que se ve (por ejemplo mientras gira la rueda). Devuelve la función para soltarlo. */
+function lockBalance(maxMs = 15000) {
+  bal.locks++;
+  let done = false;
+  const release = () => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    bal.locks--;
+    renderBalance();
+  };
+  const timer = setTimeout(release, maxMs);
+  return release;
 }
 
-// ═══════════════ Interfaz de usuario / sesión ═══════════════
+/** Esconde un premio que ya está en el saldo hasta que termine la animación. Devuelve la función para mostrarlo. */
+function hideBalance(amount, maxMs = 15000) {
+  if (!(amount > 0)) return () => {};
+  const id = ++bal.seq;
+  bal.hidden.set(id, amount);
+  renderBalance(false);
+  const timer = setTimeout(() => reveal(), maxMs);
+  function reveal() {
+    clearTimeout(timer);
+    if (bal.hidden.delete(id)) renderBalance();
+  }
+  return reveal;
+}
+
+// ═══════════════ Interfaz que usan los juegos ═══════════════
+
+const shellListeners = {};
+const shell = {
+  socket,
+  sound,
+  state,
+  current: null,
+  get balance() {
+    return bal.server;
+  },
+  setBalance,
+  lockBalance,
+  hideBalance,
+  on(evt, fn) {
+    (shellListeners[evt] = shellListeners[evt] || []).push(fn);
+  },
+  /** Emite al servidor y devuelve la respuesta ({ ok, ... }); nunca lanza error. */
+  emit(name, data = {}, timeout = 8000) {
+    return new Promise((resolve) => {
+      if (!socket.connected) {
+        resolve({ ok: false, error: 'Sin conexión, esperá un momento', code: 'OFFLINE' });
+        return;
+      }
+      socket.timeout(timeout).emit(name, data, (err, res) => {
+        if (err) resolve({ ok: false, error: 'El servidor no respondió, probá de nuevo', code: 'TIMEOUT' });
+        else resolve(res || { ok: false, error: 'Respuesta inválida' });
+      });
+    });
+  },
+  requireUser() {
+    if (state.user) return true;
+    openAuth('login');
+    return false;
+  },
+  openAuth: (mode) => openAuth(mode),
+  openWallet: (tab) => openWallet(tab),
+  openRules: () => openRules(),
+  setNavBadge(gameId, on) {
+    const a = els.gameNav.querySelector(`[data-game="${gameId}"]`);
+    if (a) a.classList.toggle('busy', !!on);
+  },
+  refreshMine() {
+    if (state.sideTab === 'mine') loadMine();
+  },
+  showSideTab: (tab) => showSideTab(tab),
+  isVisible: (id) => shell.current === id && !document.hidden,
+};
+
+function fire(evt, ...args) {
+  for (const fn of shellListeners[evt] || []) {
+    try {
+      fn(...args);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+}
+
+const games = {
+  crash: createCrash(shell),
+  mines: createMines(shell),
+  penalty: createPenalty(shell),
+  double: createDouble(shell),
+  plinko: createPlinko(shell),
+  roulette: createRoulette(shell),
+};
+
+function eachGame(method, ...args) {
+  for (const g of Object.values(games)) {
+    if (typeof g[method] !== 'function') continue;
+    try {
+      g[method](...args);
+    } catch (err) {
+      console.error(`[${g.id}.${method}]`, err);
+    }
+  }
+}
+
+// ═══════════════ Navegación entre juegos ═══════════════
+
+function gameFromPath(pathname) {
+  const p = pathname.replace(/\/+$/, '') || '/';
+  if (p === '/crash') return 'crash';
+  const g = GAMES.find((x) => x.path === p);
+  return g ? g.id : 'crash';
+}
+
+function route(id, { push = false } = {}) {
+  const g = GAME_BY_ID[id] || GAME_BY_ID.crash;
+  if (push && location.pathname !== g.path) history.pushState({ game: g.id }, '', g.path);
+  if (shell.current === g.id) return;
+  const prev = shell.current && games[shell.current];
+  if (prev && prev.hide) prev.hide();
+  shell.current = g.id;
+  $$('.game-view').forEach((v) => (v.hidden = v.dataset.view !== g.id));
+  const game = games[g.id];
+  if (!game.mounted) {
+    game.mounted = true;
+    game.mount($(`.game-view[data-view="${g.id}"]`));
+  }
+  if (game.show) game.show();
+  document.title = g.id === 'crash' ? 'CrashPY · El crash paraguayo 🇵🇾' : `${g.icon} ${g.name} · CrashPY`;
+  $$('a', els.gameNav).forEach((a) => {
+    const on = a.dataset.game === g.id;
+    a.classList.toggle('active', on);
+    if (on) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
+  const activeLink = els.gameNav.querySelector('a.active');
+  if (activeLink && activeLink.scrollIntoView) activeLink.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  els.crashLive.hidden = g.id !== 'crash';
+  els.feedLive.hidden = g.id === 'crash';
+  els.betsCount.hidden = g.id !== 'crash';
+  if (state.sideTab === 'mine') loadMine();
+  if (push) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+els.gameNav.addEventListener('click', (e) => {
+  const a = e.target.closest('a[data-game]');
+  if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+  e.preventDefault();
+  sound._ensure();
+  route(a.dataset.game, { push: true });
+});
+
+window.addEventListener('popstate', () => route(gameFromPath(location.pathname)));
+
+function renderNavState() {
+  for (const g of GAMES) {
+    if (g.id === 'crash') continue;
+    const a = els.gameNav.querySelector(`[data-game="${g.id}"]`);
+    if (a) a.classList.toggle('off', state.settings['game_' + g.id] === false);
+  }
+}
+
+// ═══════════════ Sesión ═══════════════
 
 function updateAuthUI() {
   const u = state.user;
@@ -627,7 +279,6 @@ function updateAuthUI() {
       : !state.settings.chat_enabled && u.role !== 'admin'
         ? 'El chat está desactivado'
         : 'Escribí un mensaje…';
-  panels.forEach((p) => p.render());
   renderDrawer();
 }
 
@@ -636,10 +287,9 @@ function applySettings() {
   const banner = (s.banner || '').trim();
   els.siteBanner.hidden = !banner;
   els.siteBanner.textContent = banner;
-  panels.forEach((p) => {
-    p.buildQuick();
-    if (p.amount < s.min_bet || p.amount > s.max_bet) p.setAmount(p.amount);
-  });
+  renderNavState();
+  eachGame('onSettings', s);
+  fire('settings', s);
   updateAuthUI();
 }
 
@@ -655,8 +305,9 @@ async function logout() {
     /* igual cerramos */
   }
   state.user = null;
-  panels.forEach((p) => p.reset());
   updateAuthUI();
+  eachGame('onUser', null);
+  fire('user', null);
   closeDrawer();
   reconnect();
   toast('Cerraste sesión. ¡Aguyje! 👋', 'info');
@@ -665,12 +316,14 @@ async function logout() {
 function onLoggedIn(user, isNew) {
   state.user = user;
   updateAuthUI();
+  eachGame('onUser', user);
+  fire('user', user);
   reconnect();
   toast(isNew ? `¡Bienvenido/a a CrashPY, ${user.username}! 🚀` : `¡Mba'éichapa, ${user.username}! 👋`, 'success');
   if (isNew && user.balance <= 0) setTimeout(() => openWallet('deposit'), 700);
 }
 
-// ═══════════════ Socket: eventos del juego ═══════════════
+// ═══════════════ Conexión ═══════════════
 
 socket.on('connect', () => {
   state.connected = true;
@@ -682,142 +335,25 @@ socket.on('disconnect', () => {
   setTimeout(() => {
     if (!state.connected) els.connBanner.hidden = false;
   }, 1200);
-  sound.engineStop();
+  eachGame('onDisconnect');
 });
 
 socket.on('init', (d) => {
+  state.lastInit = d;
   state.settings = { ...state.settings, ...d.settings };
   state.fair = d.fair;
+  const userChanged = (state.user && state.user.id) !== (d.user && d.user.id);
   state.user = d.user;
   state.online = d.online;
+  state.feed = d.feed || [];
   applySettings();
-  applyGame(d.game);
-  d.mine.forEach((b, slot) => {
-    const p = panels[slot];
-    if (b) p.onServerBet(b);
-    else if (['placed', 'active', 'cashing', 'sending', 'won'].includes(p.status)) {
-      p.status = 'idle';
-      p.bet = null;
-      p.render();
-    }
-  });
-  if (!d.user) panels.forEach((p) => p.reset());
+  eachGame('onInit', d);
+  if (userChanged) eachGame('onUser', d.user);
+  fire('init', d);
   renderChat(d.chat);
   renderOnline();
+  renderFeed();
   if (state.sideTab === 'mine') loadMine();
-});
-
-function applyGame(g) {
-  const now = performance.now();
-  state.phase = g.phase;
-  state.paused = g.paused;
-  state.roundId = g.roundId;
-  state.growth = g.growth;
-  state.bettingMs = g.bettingMs || state.bettingMs;
-  state.history = g.history || [];
-  state.bets = new Map((g.bets || []).map((b) => [b.id, b]));
-  state.betsDirty = true;
-  if (g.phase === 'BETTING') state.bettingEndsLocal = now + (g.bettingLeft || 0);
-  if (g.phase === 'RUNNING') state.startLocal = now - (g.elapsed || 0);
-  if (g.phase === 'CRASHED' && g.last) {
-    state.crash = g.last;
-    state.crashElapsed = msForMultiplier(Math.max(100, g.last.crash || 100), g.growth);
-    state.nextLocal = now + (g.last.nextIn || 0);
-  }
-  if (g.phase !== 'RUNNING') graph.clearRound();
-  renderHistory();
-  els.roundLabel.textContent = `Ronda #${g.roundId || '—'}`;
-}
-
-socket.on('betting', (d) => {
-  state.phase = 'BETTING';
-  state.paused = false;
-  state.roundId = d.roundId;
-  state.growth = d.growth;
-  state.bettingMs = d.ms;
-  state.bettingEndsLocal = performance.now() + d.ms;
-  state.crash = null;
-  state.bets.clear();
-  state.betsDirty = true;
-  graph.clearRound();
-  els.roundLabel.textContent = `Ronda #${d.roundId}`;
-  panels.forEach((p) => p.onBetting());
-});
-
-socket.on('start', (d) => {
-  state.phase = 'RUNNING';
-  state.roundId = d.roundId;
-  state.growth = d.growth;
-  state.startLocal = performance.now();
-  state.launchUntil = performance.now() + 1000;
-  panels.forEach((p) => p.onStart());
-  if (!document.hidden) sound.launch();
-});
-
-socket.on('tick', (d) => {
-  if (state.phase !== 'RUNNING') return;
-  const candidate = performance.now() - d.e;
-  // Nos quedamos con la estimación más temprana (la de menor latencia)
-  if (candidate < state.startLocal) state.startLocal = candidate;
-});
-
-socket.on('crash', (d) => {
-  state.phase = 'CRASHED';
-  state.crash = d;
-  state.crashElapsed = msForMultiplier(Math.max(100, d.crash || 100), state.growth);
-  state.nextLocal = performance.now() + (d.nextIn || 4000);
-  for (const b of state.bets.values()) if (b.status === 'active') b.status = d.cancelled ? 'refunded' : 'lost';
-  state.betsDirty = true;
-  state.history.unshift({ id: d.roundId, crash: d.crash, cancelled: !!d.cancelled });
-  if (state.history.length > 50) state.history.length = 50;
-  renderHistory(true);
-  graph.explode();
-  els.stageFlash.classList.remove('go');
-  void els.stageFlash.offsetWidth;
-  els.stageFlash.classList.add('go');
-  if (!document.hidden) sound.crash();
-  else sound.engineStop();
-  panels.forEach((p) => p.onCrash(d));
-  if (state.sideTab === 'mine') setTimeout(loadMine, 600);
-});
-
-socket.on('paused', (d) => {
-  state.paused = d.paused;
-  if (d.paused && d.phase === 'PAUSED') {
-    state.phase = 'PAUSED';
-    graph.clearRound();
-  }
-  if (d.paused && d.phase !== 'PAUSED') toast('⏸ El juego se va a pausar al terminar esta ronda', 'info');
-});
-
-socket.on('bet', (b) => {
-  state.bets.set(b.id, b);
-  state.betsDirty = true;
-});
-
-socket.on('cashout', (d) => {
-  const b = state.bets.get(d.id);
-  if (b) Object.assign(b, { status: 'won', cashout: d.cashout, payout: d.payout });
-  state.betsDirty = true;
-  const own = !!(state.user && d.uid === state.user.id);
-  const label = own ? `+${fmtGs(d.payout - d.amount)}` : `${d.user} ${fmtMult(d.cashout)}`;
-  graph.addMarker(msForMultiplier(d.cashout, state.growth), d.cashout, label, own);
-});
-
-socket.on('betCancel', (d) => {
-  state.bets.delete(d.id);
-  state.betsDirty = true;
-});
-
-socket.on('betRefund', (d) => {
-  const b = state.bets.get(d.id);
-  if (b) b.status = 'refunded';
-  state.betsDirty = true;
-});
-
-socket.on('myBet', (b) => {
-  const p = panels[b.slot];
-  if (p) p.onServerBet(b);
 });
 
 socket.on('balance', (d) => setBalance(d.balance));
@@ -849,187 +385,50 @@ function renderOnline() {
   els.chatOnline.textContent = `· ${fmtNum(state.online.n)} en línea`;
 }
 
+// ═══════════════ Jugadas en vivo (todos los juegos) ═══════════════
+
+socket.on('feed', (batch) => {
+  if (!Array.isArray(batch) || !batch.length) return;
+  for (const f of batch) state.feed.unshift(f);
+  if (state.feed.length > 30) state.feed.length = 30;
+  renderFeed(batch.length);
+});
+
+function renderFeed(fresh = 0) {
+  const me = state.user ? state.user.username : null;
+  const rows = state.feed.slice(0, 25).map((f, i) => {
+    const g = GAME_BY_ID[f.game] || GAME_BY_ID.crash;
+    const won = f.payout > 0;
+    return h(
+      'div',
+      { class: `bet-row feed-row ${won ? 'won' : 'lost'}${f.user === me ? ' me' : ''}${i < fresh ? ' fresh' : ''}${f.game === shell.current ? ' here' : ''}` },
+      h('div', { class: 'bet-user' }, h('span', { class: 'feed-game', title: g.name }, g.icon), h('span', null, f.user)),
+      h('div', { class: 'bet-amount' }, fmtNum(f.amount)),
+      h('div', { class: `bet-mult ${won ? multClass(f.multiplier) : 'muted'}` }, won ? fmtMult(f.multiplier) : '0.00x'),
+      h('div', { class: 'bet-win' }, won ? fmtNum(f.payout) : '—'),
+    );
+  });
+  if (!rows.length) rows.push(h('div', { class: 'empty' }, 'Todavía no hay jugadas. ¡Arrancá vos! 🎲'));
+  els.feedList.replaceChildren(...rows);
+}
+
 // ═══════════════ Bucle de animación ═══════════════
 
-let lastTickSecond = -1;
-
-function computeView(now) {
-  const v = { phase: state.phase, growth: state.growth };
-  if (state.phase === 'RUNNING') v.elapsed = Math.max(0, now - state.startLocal);
-  if (state.phase === 'CRASHED' && state.crash) {
-    v.crashElapsed = state.crashElapsed;
-    v.crashM = state.crash.crash;
-    v.cancelled = !!state.crash.cancelled;
-  }
-  if (state.phase === 'BETTING') {
-    v.left = Math.max(0, state.bettingEndsLocal - now);
-    v.bettingFrac = state.bettingMs ? v.left / state.bettingMs : 0;
-  }
-  return v;
-}
-
-function tierClass(m) {
-  if (m < 200) return 't1';
-  if (m < 500) return 't2';
-  if (m < 1000) return 't3';
-  return 't4';
-}
-
-let engineUpdateAt = 0;
-
-function updateOverlay(v, now) {
-  const st = els.stageStatus;
-  const mult = els.stageMult;
-  const sub = els.stageSub;
-  let showCountdown = false;
-  switch (v.phase) {
-    case 'RUNNING': {
-      const m = multiplierAt(v.elapsed, state.growth);
-      setText(mult, fmtMult(m));
-      setClass(mult, `stage-mult ${tierClass(m)}`);
-      if (now < state.launchUntil) {
-        setText(st, '¡JAHA! 🚀');
-        setClass(st, 'stage-status launch');
-      } else {
-        setText(st, '');
-        setClass(st, 'stage-status');
-      }
-      setText(sub, state.paused ? '⏸ Pausa al terminar esta ronda' : '');
-      if (now > engineUpdateAt) {
-        engineUpdateAt = now + 120;
-        sound.engineUpdate(m / 100);
-      }
-      break;
-    }
-    case 'BETTING': {
-      const secs = v.left / 1000;
-      setText(st, 'PRÓXIMA RONDA EN');
-      setClass(st, 'stage-status');
-      setText(mult, `${secs.toFixed(1)}s`);
-      setClass(mult, 'stage-mult waiting');
-      setText(sub, state.user ? '¡Hacé tu apuesta! 🎯' : 'Ingresá para apostar 🎯');
-      showCountdown = true;
-      els.countdownBar.style.transform = `scaleX(${Math.max(0, Math.min(1, v.bettingFrac))})`;
-      const sec = Math.ceil(secs);
-      if (sec <= 3 && sec > 0 && sec !== lastTickSecond) {
-        lastTickSecond = sec;
-        sound.tick();
-      }
-      break;
-    }
-    case 'CRASHED': {
-      const c = state.crash || {};
-      setText(st, c.cancelled ? 'RONDA ANULADA' : '¡EXPLOTÓ!');
-      setClass(st, 'stage-status crashed');
-      setText(mult, fmtMult(c.crash));
-      setClass(mult, `stage-mult ${c.cancelled ? 'cancelled' : 'crashed'}`);
-      let text;
-      if (c.cancelled) {
-        text =
-          c.mode === 'pay'
-            ? `El admin detuvo la ronda: se pagó a todos a ${fmtMult(c.crash)}`
-            : 'La ronda se anuló: se devolvieron las apuestas';
-      } else {
-        const left = Math.max(0, Math.ceil((state.nextLocal - now) / 1000));
-        text = state.paused ? '⏸ El juego se pausa ahora' : `Próxima ronda en ${left}s`;
-      }
-      setText(sub, text);
-      break;
-    }
-    case 'PAUSED':
-      setText(st, 'JUEGO EN PAUSA');
-      setClass(st, 'stage-status');
-      setText(mult, '⏸');
-      setClass(mult, 'stage-mult waiting');
-      setText(sub, 'Volvemos enseguida 🙏');
-      break;
-    default:
-      setText(st, '');
-      setText(mult, '···');
-      setClass(mult, 'stage-mult waiting');
-      setText(sub, 'Conectando…');
-  }
-  if (els.countdown.hidden === showCountdown) els.countdown.hidden = !showCountdown;
-  if (v.phase !== 'BETTING') lastTickSecond = -1;
-}
-
-let lastBetsRender = 0;
-
 function loop(now) {
-  const view = computeView(now);
-  graph.frame(view);
-  updateOverlay(view, now);
-  for (const p of panels) p.frame(view);
-  if (state.betsDirty && now - lastBetsRender > 180) {
-    lastBetsRender = now;
-    renderBets();
+  const g = games[shell.current];
+  if (g && g.frame && !document.hidden) {
+    try {
+      g.frame(now);
+    } catch (err) {
+      console.error(err);
+    }
   }
   requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop);
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) sound.engineStop();
 });
-
-// Barra espaciadora = retirar (panel 1) cuando hay apuesta en vuelo
-document.addEventListener('keydown', (e) => {
-  if (e.code !== 'Space' || e.repeat) return;
-  const tag = (e.target && e.target.tagName) || '';
-  if (/INPUT|TEXTAREA|SELECT|BUTTON/.test(tag) || document.body.classList.contains('modal-open')) return;
-  const p = panels.find((x) => x.status === 'active');
-  if (p) {
-    e.preventDefault();
-    p.cashout();
-  }
-});
-
-// ═══════════════ Historial y lista de apuestas ═══════════════
-
-function renderHistory(animateFirst = false) {
-  const items = state.history.slice(0, 30).map((r, i) =>
-    h(
-      'button',
-      {
-        type: 'button',
-        class: `hist-pill ${r.cancelled ? 'cancelled' : multClass(r.crash)}${animateFirst && i === 0 ? ' new' : ''}`,
-        title: `Ronda #${r.id}${r.cancelled ? ' (anulada)' : ''}`,
-        onclick: () => openRound(r.id),
-      },
-      fmtMult(r.crash),
-    ),
-  );
-  els.historyList.replaceChildren(...items);
-  els.historyList.scrollLeft = 0;
-}
-
-function renderBets() {
-  state.betsDirty = false;
-  const list = [...state.bets.values()].filter((b) => b.status !== 'cancelled');
-  list.sort((a, b) => b.amount - a.amount || a.id - b.id);
-  const total = list.reduce((sum, b) => sum + (b.status === 'refunded' ? 0 : b.amount), 0);
-  const players = new Set(list.map((b) => b.uid)).size;
-  els.betsCount.textContent = String(list.length);
-  els.betsPlayers.textContent = `${players} jugador${players === 1 ? '' : 'es'}`;
-  els.betsTotal.textContent = fmtGs(total);
-  els.roundPlayers.textContent = `👥 ${players}`;
-  els.roundTotal.textContent = fmtGs(total);
-  const me = state.user ? state.user.id : null;
-  const rows = list.slice(0, 150).map((b) => {
-    const lost = b.status === 'lost' || (state.phase === 'CRASHED' && b.status === 'active');
-    const cls = b.status === 'won' ? 'won' : lost ? 'lost' : b.status === 'refunded' ? 'refunded' : '';
-    return h(
-      'div',
-      { class: `bet-row ${cls}${b.uid === me ? ' me' : ''}` },
-      h('div', { class: 'bet-user' }, avatar(b.user), h('span', null, b.user)),
-      h('div', { class: 'bet-amount' }, fmtNum(b.amount)),
-      h('div', { class: `bet-mult ${b.cashout ? multClass(b.cashout) : 'muted'}` }, b.cashout ? fmtMult(b.cashout) : b.status === 'refunded' ? '↩' : '—'),
-      h('div', { class: 'bet-win' }, b.payout ? fmtNum(b.payout) : lost ? '💥' : '—'),
-    );
-  });
-  if (!rows.length) rows.push(h('div', { class: 'empty' }, state.phase === 'BETTING' ? '¡Sé el primero en apostar! 🚀' : 'Sin apuestas en esta ronda'));
-  els.betsList.replaceChildren(...rows);
-}
 
 // ═══════════════ Pestañas laterales ═══════════════
 
@@ -1046,53 +445,9 @@ function showSideTab(tab) {
   if (tab === 'top') loadTop();
 }
 
-async function loadMine() {
-  if (!state.user) {
-    els.mineList.replaceChildren(
-      h('div', { class: 'empty' }, 'Ingresá para ver tus apuestas', h('br'), h('br'), h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openAuth('login') }, 'Ingresar')),
-    );
-    return;
-  }
-  try {
-    const { items } = await api('/api/me/bets');
-    if (!items.length) {
-      els.mineList.replaceChildren(h('div', { class: 'empty' }, 'Todavía no apostaste. ¡Probá suerte! 🍀'));
-      return;
-    }
-    els.mineList.replaceChildren(
-      ...items.map((b) => {
-        let result;
-        let badge;
-        if (b.status === 'won') {
-          result = h('span', { class: 'green' }, fmtSigned(b.payout - b.amount));
-          badge = h('span', { class: `mr-badge ${multClass(b.cashout)}` }, fmtMult(b.cashout));
-        } else if (b.status === 'lost') {
-          result = h('span', { class: 'red' }, fmtSigned(-b.amount));
-          badge = h('span', { class: 'mr-badge red' }, '💥');
-        } else if (b.status === 'refunded') {
-          result = h('span', { class: 'muted' }, 'Devuelta');
-          badge = h('span', { class: 'mr-badge' }, '↩');
-        } else {
-          result = h('span', { class: 'gold' }, 'En juego');
-          badge = h('span', { class: 'mr-badge' }, '🚀');
-        }
-        return h(
-          'div',
-          { class: 'mine-row', onclick: () => b.crash != null && openRound(b.round_id), style: { cursor: 'pointer' } },
-          badge,
-          h(
-            'div',
-            { class: 'mr-main' },
-            h('div', { class: 'mr-top' }, `Apostaste ${fmtGs(b.amount)}`),
-            h('div', { class: 'mr-sub' }, `Ronda #${b.round_id} · ${fmtTime(b.created_at)}${b.crash != null ? ` · explotó en ${fmtMult(b.crash)}` : ''}`),
-          ),
-          h('div', { class: 'mr-result' }, result),
-        );
-      }),
-    );
-  } catch (err) {
-    els.mineList.replaceChildren(h('div', { class: 'empty' }, err.message));
-  }
+function loadMine() {
+  const g = games[shell.current];
+  if (g && g.loadMine) g.loadMine(els.mineList);
 }
 
 $('#topPeriod').addEventListener('click', (e) => {
@@ -1103,18 +458,26 @@ $('#topPeriod').addEventListener('click', (e) => {
   loadTop();
 });
 
+/** Abre el detalle correcto según el juego (ronda del Crash, ronda del Double o jugada). */
+function openWin(w) {
+  if (w.game === 'crash') games.crash.openRound(w.round_id);
+  else if (w.game === 'double') openDoubleRound(shell, w.round_id);
+  else openPlay(shell, w.round_id);
+}
+
 async function loadTop() {
   els.topList.replaceChildren(h('div', { class: 'empty' }, h('span', { class: 'spinner' })));
   try {
     const data = await api('/api/top?period=' + state.topPeriod);
-    const section = (title, rows) =>
-      h('div', { class: 'top-section' }, h('h4', null, title), rows.length ? rows : h('div', { class: 'empty' }, 'Todavía nada por acá'));
-    const winRow = (w, i, mode) =>
-      h(
+    const section = (title, rows) => h('div', { class: 'top-section' }, h('h4', null, title), rows.length ? rows : h('div', { class: 'empty' }, 'Todavía nada por acá'));
+    const winRow = (w, i, mode) => {
+      const g = GAME_BY_ID[w.game] || GAME_BY_ID.crash;
+      const where = w.game === 'crash' || w.game === 'double' ? `ronda #${w.round_id}` : `jugada #${w.round_id}`;
+      return h(
         'div',
-        { class: 'top-row', onclick: () => openRound(w.round_id), style: { cursor: 'pointer' } },
+        { class: 'top-row', onclick: () => openWin(w), style: { cursor: 'pointer' } },
         h('span', { class: 'top-rank' }, i + 1),
-        h('div', { class: 'top-main' }, h('b', null, w.user), h('small', null, `Apostó ${fmtGs(w.amount)} · ronda #${w.round_id}`)),
+        h('div', { class: 'top-main' }, h('b', null, w.user), h('small', null, `${g.icon} ${g.name} · apostó ${fmtGs(w.amount)} · ${where}`)),
         h(
           'div',
           { class: 'top-value' },
@@ -1122,15 +485,16 @@ async function loadTop() {
           h('small', null, mode === 'mult' ? fmtGs(w.payout) : `a ${fmtMult(w.cashout)}`),
         ),
       );
+    };
     els.topList.replaceChildren(
       section('🤑 Mayores ganancias', data.wins.map((w, i) => winRow(w, i, 'win'))),
-      section('🚀 Mejores retiros', data.multipliers.map((w, i) => winRow(w, i, 'mult'))),
+      section('🔥 Mejores multiplicadores', data.multipliers.map((w, i) => winRow(w, i, 'mult'))),
       section(
-        '💥 Rondas más altas',
+        '💥 Rondas más altas del Crash',
         data.rounds.map((r, i) =>
           h(
             'div',
-            { class: 'top-row', onclick: () => openRound(r.id), style: { cursor: 'pointer' } },
+            { class: 'top-row', onclick: () => games.crash.openRound(r.id), style: { cursor: 'pointer' } },
             h('span', { class: 'top-rank' }, i + 1),
             h('div', { class: 'top-main' }, h('b', null, `Ronda #${r.id}`)),
             h('div', { class: 'top-value' }, h('span', { class: multClass(r.crash_point) }, fmtMult(r.crash_point))),
@@ -1145,17 +509,21 @@ async function loadTop() {
 
 // ═══════════════ Chat ═══════════════
 
-const EMOJIS = ['😀', '😂', '🤣', '😎', '😍', '🤑', '😱', '😭', '😡', '🥳', '🙏', '👏', '👍', '💪', '🔥', '🚀', '💥', '💸', '💰', '🍀', '🎯', '🤞', '🇵🇾', '🧉', '⚽', '❤️', '💙', '👀', '🤡', '😴', '🥶', '🫡'];
+const EMOJIS = ['😀', '😂', '🤣', '😎', '😍', '🤑', '😱', '😭', '😡', '🥳', '🙏', '👏', '👍', '💪', '🔥', '🚀', '💥', '💸', '💰', '🍀', '🎯', '🤞', '🇵🇾', '🧉', '⚽', '💣', '💎', '🎰', '❤️', '💙', '👀', '🤡'];
 
 els.emojiPicker.replaceChildren(
   ...EMOJIS.map((e) =>
-    h('button', {
-      type: 'button',
-      onclick: () => {
-        els.chatInput.value += e;
-        els.chatInput.focus();
+    h(
+      'button',
+      {
+        type: 'button',
+        onclick: () => {
+          els.chatInput.value += e;
+          els.chatInput.focus();
+        },
       },
-    }, e),
+      e,
+    ),
   ),
 );
 
@@ -1206,7 +574,7 @@ function scrollChat() {
 
 function renderChat(messages) {
   els.chatList.replaceChildren(...(messages || []).map(chatMessageNode));
-  if (!messages || !messages.length) els.chatList.append(h('div', { class: 'msg-sys' }, '¡Mba\'éichapa! Saludá a la hinchada 👋'));
+  if (!messages || !messages.length) els.chatList.append(h('div', { class: 'msg-sys' }, "¡Mba'éichapa! Saludá a la hinchada 👋"));
   requestAnimationFrame(scrollChat);
 }
 
@@ -1290,6 +658,11 @@ function closeDrawer() {
   els.drawerBackdrop.hidden = true;
 }
 
+function scrollToSide(tab) {
+  showSideTab(tab);
+  els.sideCol.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function renderDrawer() {
   const u = state.user;
   const item = (icon, label, fn, href) => {
@@ -1312,7 +685,7 @@ function renderDrawer() {
   const nodes = [];
   if (u) {
     nodes.push(
-      h('div', { class: 'drawer-user' }, avatar(u.username, 42), h('div', null, h('b', null, u.username), h('small', null, `Saldo: ${fmtGs(state.balance)}`))),
+      h('div', { class: 'drawer-user' }, avatar(u.username, 42), h('div', null, h('b', null, u.username), h('small', null, `Saldo: ${fmtGs(bal.shown)}`))),
       h(
         'div',
         { class: 'drawer-actions' },
@@ -1321,10 +694,7 @@ function renderDrawer() {
       ),
       item('📜', 'Movimientos', () => openWallet('history')),
       item('🧾', 'Mis depósitos y retiros', () => openWallet('requests')),
-      item('🎯', 'Mis apuestas', () => {
-        showSideTab('mine');
-        $('#sideCol').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }),
+      item('🎯', 'Mis apuestas', () => scrollToSide('mine')),
       item('👤', 'Mi perfil', openProfile),
     );
   } else {
@@ -1339,15 +709,33 @@ function renderDrawer() {
   }
   nodes.push(
     h('div', { class: 'drawer-sep' }),
-    item('🏆', 'Top ganadores', () => {
-      showSideTab('top');
-      $('#sideCol').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }),
-    item('🕒', 'Historial de rondas', openHistory),
+    h('div', { class: 'drawer-label' }, 'Juegos'),
+    h(
+      'div',
+      { class: 'drawer-games' },
+      ...GAMES.map((g) =>
+        h(
+          'a',
+          {
+            class: `drawer-game${shell.current === g.id ? ' active' : ''}`,
+            href: g.path,
+            onclick: (e) => {
+              e.preventDefault();
+              closeDrawer();
+              route(g.id, { push: true });
+            },
+          },
+          h('span', null, g.icon),
+          g.name,
+        ),
+      ),
+    ),
+    h('div', { class: 'drawer-sep' }),
+    item('🏆', 'Top ganadores', () => scrollToSide('top')),
     item('🔐', 'Provably fair (verificar)', null, '/fair'),
-    item('📖', 'Cómo jugar y reglas', openRules),
-    item(sound.enabled ? '🔊' : '🔇', `Sonido: ${sound.enabled ? 'activado' : 'apagado'}`, toggleSound),
   );
+  if (u) nodes.push(item('🎲', 'Mis semillas', () => openFairness(shell)));
+  nodes.push(item('📖', 'Cómo jugar y reglas', openRules), item(sound.enabled ? '🔊' : '🔇', `Sonido: ${sound.enabled ? 'activado' : 'apagado'}`, toggleSound));
   const wa = String(state.settings.support_whatsapp || '').replace(/[^\d]/g, '');
   if (wa) {
     const number = wa.startsWith('0') ? '595' + wa.slice(1) : wa;
@@ -1365,7 +753,6 @@ $('#btnLogin').addEventListener('click', () => openAuth('login'));
 $('#btnRegister').addEventListener('click', () => openAuth('register'));
 $('#btnDeposit').addEventListener('click', () => openWallet('deposit'));
 els.balancePill.addEventListener('click', () => openWallet('deposit'));
-$('#btnHistory').addEventListener('click', openHistory);
 $('#linkRules').addEventListener('click', (e) => {
   e.preventDefault();
   openRules();
@@ -1386,14 +773,9 @@ function field(label, input, hint) {
 }
 
 function openAuth(mode = 'login') {
-  const tabs = h(
-    'div',
-    { class: 'tabs auth-tabs' },
-    h('button', { type: 'button', 'data-mode': 'login' }, 'Ingresar'),
-    h('button', { type: 'button', 'data-mode': 'register' }, 'Crear cuenta'),
-  );
+  const tabs = h('div', { class: 'tabs auth-tabs' }, h('button', { type: 'button', 'data-mode': 'login' }, 'Ingresar'), h('button', { type: 'button', 'data-mode': 'register' }, 'Crear cuenta'));
   const body = h('div');
-  const hero = h('div', { class: 'auth-hero' }, h('img', { src: '/img/icon.svg', alt: '' }), h('p', null, 'El crash paraguayo en guaraníes 🇵🇾'));
+  const hero = h('div', { class: 'auth-hero' }, h('img', { src: '/img/icon.svg', alt: '' }), h('p', null, 'El casino paraguayo en guaraníes 🇵🇾'));
   const modal = openModal({ title: '', content: h('div', null, hero, tabs, body) });
 
   const show = (m) => {
@@ -1607,15 +989,7 @@ async function depositView() {
         )
       : null;
   const card = hasBank
-    ? h(
-        'div',
-        { class: 'bank-card' },
-        row('Banco', bank.bank_name),
-        row('Titular', bank.bank_holder),
-        row('CI / RUC', bank.bank_doc),
-        row('Nº de cuenta', bank.bank_account),
-        row('Alias', bank.bank_alias),
-      )
+    ? h('div', { class: 'bank-card' }, row('Banco', bank.bank_name), row('Titular', bank.bank_holder), row('CI / RUC', bank.bank_doc), row('Nº de cuenta', bank.bank_account), row('Alias', bank.bank_alias))
     : h('div', { class: 'verify-box bad' }, 'Todavía no se cargaron los datos para transferir. Consultá al soporte.');
 
   const amount = amountInput(`Mínimo ${fmtGs(bank.min_deposit)}`);
@@ -1729,9 +1103,7 @@ async function withdrawView() {
   const type = h(
     'select',
     { class: 'input' },
-    ...['Caja de ahorro', 'Cuenta corriente', 'Billetera electrónica', 'Alias SIPAP (CI / celular)'].map((t) =>
-      h('option', { value: t, selected: saved.accountType === t }, t),
-    ),
+    ...['Caja de ahorro', 'Cuenta corriente', 'Billetera electrónica', 'Alias SIPAP (CI / celular)'].map((t) => h('option', { value: t, selected: saved.accountType === t }, t)),
   );
   const account = h('input', { class: 'input', placeholder: 'Número de cuenta o alias', value: saved.account || '', maxlength: 60 });
   const holder = h('input', { class: 'input', placeholder: 'Nombre y apellido', value: saved.holder || '', maxlength: 80 });
@@ -1762,7 +1134,7 @@ async function withdrawView() {
       error.textContent = 'Ingresá el monto a retirar';
       return;
     }
-    if (value > state.balance) {
+    if (value > bal.server) {
       error.textContent = 'No tenés saldo suficiente';
       return;
     }
@@ -1901,128 +1273,13 @@ async function openProfile() {
         stat('Total apostado', fmtGs(stats.total_bet)),
         stat('Total cobrado', fmtGs(stats.total_won)),
         stat('Apuestas', fmtNum(stats.bets_count)),
-        stat('Mejor retiro', stats.best_cashout ? fmtMult(stats.best_cashout) : '—'),
+        stat('Mejor multiplicador', stats.best_cashout ? fmtMult(stats.best_cashout) : '—'),
         stat('Depositado', fmtGs(stats.total_deposit)),
         stat('Retirado', fmtGs(stats.total_withdraw)),
       ),
+      h('button', { class: 'btn btn-ghost btn-block', type: 'button', style: { margin: '4px 0 14px' }, onclick: () => (modal.close(), openFairness(shell)) }, '🎲 Mis semillas (provably fair)'),
       form,
     );
-  } catch (err) {
-    body.replaceChildren(h('div', { class: 'empty' }, err.message));
-  }
-}
-
-// ═══════════════ Rondas y verificación ═══════════════
-
-function openHistory() {
-  const grid = h(
-    'div',
-    { class: 'history-grid' },
-    ...state.history.map((r) =>
-      h(
-        'button',
-        { type: 'button', class: `hist-pill ${r.cancelled ? 'cancelled' : multClass(r.crash)}`, onclick: () => openRound(r.id) },
-        fmtMult(r.crash),
-        h('small', null, `#${r.id}`),
-      ),
-    ),
-  );
-  openModal({
-    title: '🕒 Últimas rondas',
-    content: h('div', null, grid, h('p', { class: 'hint', style: { marginTop: '12px' } }, 'Tocá una ronda para ver su hash y verificarla.')),
-  });
-}
-
-async function openRound(id) {
-  const body = h('div', null, h('div', { class: 'empty' }, h('span', { class: 'spinner' })));
-  openModal({ title: `Ronda #${id}`, content: body, wide: true });
-  try {
-    const data = await api(`/api/rounds/${id}`);
-    const r = data.round;
-    if (!r.hash) {
-      body.replaceChildren(h('div', { class: 'empty' }, 'Esta ronda todavía está en juego. El hash se revela cuando explota 🔒'));
-      return;
-    }
-    const chain = data.chain;
-    const shown = r.status === 'crashed' ? r.crash_point : r.ended_multiplier;
-    const prevHash = data.previous ? data.previous.hash : r.chain_index === 1 ? chain.terminal_hash : null;
-    const cancelledText = {
-      refund: 'El administrador detuvo la ronda y se devolvieron las apuestas.',
-      pay: 'El administrador detuvo la ronda y se pagó a todos al multiplicador de ese momento.',
-      server: 'La ronda se anuló por un reinicio del servidor y se devolvieron las apuestas.',
-    };
-    const verifyOut = h('div');
-    const verifyBtn = h('button', { class: 'btn btn-blue btn-block', type: 'button' }, '✔ Verificar en este dispositivo');
-    verifyBtn.addEventListener('click', () => {
-      const computed = crashFromHash(r.hash, chain.salt, chain.house_edge_bps);
-      const link = prevHash ? sha256Hex(r.hash) === prevHash : null;
-      const ok = computed === r.crash_point && link !== false;
-      verifyOut.replaceChildren(
-        h(
-          'div',
-          { class: `verify-box ${ok ? 'ok' : 'bad'}` },
-          h('div', null, `${computed === r.crash_point ? '✅' : '❌'} El hash da un punto de explosión de ${fmtMult(computed)}${r.status === 'crashed' ? ' (coincide con la ronda)' : ''}`),
-          link === null
-            ? h('div', null, 'ℹ️ No tenemos el hash anterior para comprobar la cadena.')
-            : h('div', null, `${link ? '✅' : '❌'} SHA-256 de este hash = hash de la ronda anterior${r.chain_index === 1 ? ' (hash terminal publicado)' : ''}`),
-        ),
-      );
-    });
-    const betsRows = data.bets.map((b) =>
-      h(
-        'tr',
-        null,
-        h('td', null, b.user),
-        h('td', { class: 'num' }, fmtGs(b.amount)),
-        h('td', { class: `num ${b.cashout ? multClass(b.cashout) : 'muted'}` }, b.cashout ? fmtMult(b.cashout) : b.status === 'refunded' ? 'devuelta' : '—'),
-        h('td', { class: `num ${b.status === 'won' ? 'green' : b.status === 'lost' ? 'red' : 'muted'}` }, b.status === 'won' ? fmtSigned(b.payout - b.amount) : b.status === 'lost' ? fmtSigned(-b.amount) : '0'),
-      ),
-    );
-    const fairLink = `/fair?hash=${encodeURIComponent(r.hash)}&salt=${encodeURIComponent(chain.salt)}&edge=${chain.house_edge_bps}`;
-    body.replaceChildren(h('div', null,
-      h(
-        'div',
-        { class: 'round-hero' },
-        h('div', { class: `rh-mult ${r.status === 'cancelled' ? 'muted' : multClass(shown)}` }, fmtMult(shown)),
-        h('small', null, `${fmtDate(r.ended_at)} · ${r.players} jugador${r.players === 1 ? '' : 'es'} · apostado ${fmtGs(r.total_bet)}`),
-      ),
-      r.status === 'cancelled'
-        ? h(
-            'div',
-            { class: 'verify-box' },
-            `⚠️ Ronda anulada. ${cancelledText[r.cancel_mode] || ''} Según el hash iba a explotar en ${fmtMult(r.crash_point)}.`,
-          )
-        : null,
-      h(
-        'dl',
-        { class: 'kv' },
-        h('dt', null, 'Hash'),
-        h('dd', { class: 'mono' }, r.hash, ' ', h('button', { class: 'copy-btn', type: 'button', onclick: () => copyText(r.hash) }, '📋')),
-        h('dt', null, r.chain_index === 1 ? 'Hash terminal' : 'Hash anterior'),
-        h('dd', { class: 'mono' }, prevHash || '—'),
-        h('dt', null, 'Sal (salt)'),
-        h('dd', { class: 'mono' }, chain.salt),
-        h('dt', null, 'Ventaja casa'),
-        h('dd', null, `${(chain.house_edge_bps / 100).toFixed(2)}% (RTP ${(100 - chain.house_edge_bps / 100).toFixed(2)}%)`),
-        h('dt', null, 'Cadena'),
-        h('dd', null, `#${chain.id} · ronda ${fmtNum(r.chain_index)} de ${fmtNum(chain.length)}`),
-      ),
-      verifyBtn,
-      verifyOut,
-      h('p', { style: { textAlign: 'center', margin: '10px 0' } }, h('a', { href: fairLink }, '¿Cómo funciona? Verificación completa →')),
-      data.bets.length
-        ? h(
-            'div',
-            { class: 'table-wrap' },
-            h(
-              'table',
-              { class: 'table' },
-              h('thead', null, h('tr', null, h('th', null, 'Jugador'), h('th', { class: 'num' }, 'Apuesta'), h('th', { class: 'num' }, 'Retiro'), h('th', { class: 'num' }, 'Resultado'))),
-              h('tbody', null, ...betsRows),
-            ),
-          )
-        : h('div', { class: 'empty' }, 'Nadie apostó en esta ronda'),
-    ));
   } catch (err) {
     body.replaceChildren(h('div', { class: 'empty' }, err.message));
   }
@@ -2032,48 +1289,35 @@ async function openRound(id) {
 
 function openRules() {
   const s = state.settings;
-  const edge = state.fair ? state.fair.houseEdgeBps / 100 : 3;
+  const g = GAME_BY_ID[shell.current] || GAME_BY_ID.crash;
+  const game = games[g.id];
   const li = (...c) => h('li', null, ...c);
   openModal({
-    title: '📖 Cómo jugar',
+    title: `📖 Cómo jugar · ${g.icon} ${g.name}`,
     content: h(
       'div',
       { class: 'rules' },
-      h(
-        'ol',
-        null,
-        li('Elegí cuánto apostar y tocá ', h('b', null, 'APOSTAR'), ' antes de que despegue el cohete 🚀.'),
-        li('El multiplicador sube desde 1.00x. Lo que cobrás = apuesta × multiplicador.'),
-        li('Tocá ', h('b', null, 'RETIRAR'), ' cuando quieras. Si el cohete explota antes 💥, perdés la apuesta.'),
-        li(h('b', null, 'Auto retiro:'), ' el sistema retira por vos al llegar al multiplicador que elegiste (funciona aunque se te corte internet).'),
-        li(h('b', null, 'Auto apuesta:'), ' repite tu apuesta en cada ronda.'),
-        li('Podés tener 2 apuestas por ronda con el botón “Agregar segunda apuesta”.'),
-      ),
-      h('h4', null, '📋 Reglas'),
+      game && game.rules ? game.rules() : null,
+      h('h4', null, '📋 Reglas generales'),
       h(
         'ul',
         null,
         li(`Apuesta mínima ${fmtGs(s.min_bet)} · máxima ${fmtGs(s.max_bet)}.`),
-        li(`Ganancia máxima por apuesta: ${fmtGs(s.max_profit)} (al llegar, se retira sola).`),
-        li(`Retorno al jugador (RTP): ${(100 - edge).toFixed(2)}% · ventaja de la casa ${edge.toFixed(2)}%.`),
-        li('Una ronda puede explotar en 1.00x, sin tiempo para retirar.'),
-        li('Si el servidor se reinicia o el administrador detiene una ronda, la ronda se anula: nadie pierde su apuesta.'),
-        li('Los resultados se pueden verificar con el sistema Provably Fair (hash SHA-256).'),
+        li(`Ganancia máxima por apuesta o jugada: ${fmtGs(s.max_profit)}.`),
+        li('Retorno al jugador (RTP): 97% en Crash, Minas, Penales y Plinko · 97,3% en la Ruleta · 96,8% en el Double.'),
+        li('Si el servidor se reinicia en medio de una ronda, nadie pierde: las apuestas se devuelven (o se pagan si el resultado ya se había mostrado).'),
       ),
       h('h4', null, '🔐 Juego comprobable'),
       h(
         'p',
         { class: 'hint' },
-        'Todas las rondas salen de una cadena de hashes publicada de antemano. Nadie (ni el casino) puede cambiar un resultado. Tocá cualquier ronda del historial para verificarla, o mirá ',
+        'Crash y Double salen de cadenas de hashes publicadas de antemano. Minas, Penales, Plinko y Ruleta usan tus semillas: la del servidor queda fijada (ves su hash) antes de jugar y vos elegís la tuya. Nadie (ni el casino) puede cambiar un resultado. Mirá ',
         h('a', { href: '/fair' }, 'la página de verificación'),
+        SEED_GAMES.includes(g.id) ? [' o tus ', h('a', { href: '#', onclick: (e) => (e.preventDefault(), openFairness(shell)) }, 'semillas')] : null,
         '.',
       ),
       h('h4', null, '🧉 Juego responsable'),
-      h(
-        'p',
-        { class: 'hint' },
-        'Solo para mayores de 18 años. Apostá solo lo que podés permitirte perder, poné un límite y tomá descansos. Si sentís que perdiste el control, pedí ayuda.',
-      ),
+      h('p', { class: 'hint' }, 'Solo para mayores de 18 años. Apostá solo lo que podés permitirte perder, poné un límite y tomá descansos. Si sentís que perdiste el control, pedí ayuda.'),
     ),
   });
 }
@@ -2100,4 +1344,6 @@ document.addEventListener('visibilitychange', () => {
 
 if (document.fonts && document.fonts.load) document.fonts.load('700 12px Rubik').catch(() => {});
 renderDrawer();
-renderHistory();
+renderFeed();
+route(gameFromPath(location.pathname));
+requestAnimationFrame(loop);

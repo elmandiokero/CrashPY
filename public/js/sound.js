@@ -168,6 +168,87 @@ export class Sound {
   message() {
     this._tone(1400, 0.06, { type: 'sine', vol: 0.05 });
   }
+
+  // ───────── Efectos de los demás juegos ─────────
+
+  /** Clic suave de interfaz (fichas, selección). */
+  click(pitch = 1) {
+    this._tone(900 * pitch, 0.04, { type: 'triangle', vol: 0.07 });
+  }
+
+  /** Ficha apoyada en la mesa. */
+  chip() {
+    this._noise(0.05, { vol: 0.18, from: 5200, to: 2400, type: 'bandpass', q: 3 });
+    this._tone(2100, 0.035, { type: 'sine', vol: 0.04 });
+  }
+
+  /** Diamante encontrado: cada vez un poco más agudo. */
+  gem(step = 0) {
+    const base = 660 * Math.pow(1.06, Math.min(step, 20));
+    this._tone(base, 0.12, { type: 'triangle', vol: 0.13 });
+    this._tone(base * 1.5, 0.18, { type: 'sine', vol: 0.09, when: 0.05 });
+    this._noise(0.12, { vol: 0.04, from: 9000, to: 5000, type: 'highpass', when: 0.03 });
+  }
+
+  /** Explosión corta (mina). */
+  boom() {
+    this._noise(0.9, { vol: 0.8, from: 2600, to: 50 });
+    this._tone(70, 0.6, { type: 'sine', vol: 0.45, slide: 30 });
+    this._tone(140, 0.25, { type: 'square', vol: 0.05, slide: 45 });
+  }
+
+  /** Patada a la pelota. */
+  kick() {
+    this._noise(0.08, { vol: 0.5, from: 1800, to: 200 });
+    this._tone(150, 0.12, { type: 'sine', vol: 0.35, slide: 70 });
+  }
+
+  /** ¡Gol! Hinchada festejando. */
+  goal() {
+    this._noise(1.6, { vol: 0.28, from: 900, to: 2600, type: 'bandpass', q: 0.6 });
+    [523, 659, 784, 1047].forEach((f, i) => this._tone(f, 0.25, { type: 'triangle', vol: 0.12, when: 0.05 + i * 0.08 }));
+  }
+
+  /** Atajada: pelota contra los guantes y un "uhh" de la tribuna. */
+  save() {
+    this._noise(0.1, { vol: 0.45, from: 1200, to: 150 });
+    this._noise(0.9, { vol: 0.16, from: 700, to: 300, type: 'bandpass', q: 0.8, when: 0.08 });
+    this._tone(300, 0.45, { type: 'sawtooth', vol: 0.04, slide: 160, when: 0.05 });
+  }
+
+  /** Silbato del árbitro. */
+  whistle() {
+    this._tone(2600, 0.16, { type: 'sine', vol: 0.08 });
+    this._tone(2750, 0.22, { type: 'sine', vol: 0.07, when: 0.18 });
+  }
+
+  /** Rebote en un clavo del Plinko. */
+  peg(i = 0) {
+    this._tone(1200 + (i % 8) * 90, 0.03, { type: 'sine', vol: 0.035 });
+  }
+
+  /** La bolita cae en una casilla: más festivo cuanto mayor el multiplicador. */
+  land(m100 = 100) {
+    if (m100 >= 1000) this.cashout(true);
+    else if (m100 >= 200) this.cashout(false);
+    else if (m100 >= 100) this._tone(740, 0.12, { type: 'triangle', vol: 0.1 });
+    else this._tone(330, 0.14, { type: 'triangle', vol: 0.07, slide: 260 });
+  }
+
+  /** "Tic" de la rueda al pasar cada casilla. */
+  wheelTick() {
+    this._tone(1500, 0.018, { type: 'square', vol: 0.02 });
+  }
+
+  /** Bolita de la ruleta rodando (dura `seconds`). */
+  rouletteBall(seconds = 4) {
+    this._noise(seconds, { vol: 0.07, from: 3800, to: 900, type: 'bandpass', q: 2.5 });
+  }
+
+  /** Premio (genérico). */
+  win(big = false) {
+    this.cashout(big);
+  }
 }
 
 function safeGet(key) {

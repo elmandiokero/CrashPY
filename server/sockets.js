@@ -154,6 +154,7 @@ module.exports = function setupSockets(io, ctx) {
         const play = plays[method](u.id, d);
         return { play, balance: balanceOf(u) };
       });
+    handle('plays:active', (u) => ({ plays: plays.activePlays(u.id) }));
     playHandler('mines:start', 'minesStart');
     playHandler('mines:reveal', 'minesReveal');
     playHandler('mines:cashout', 'minesCashout');
