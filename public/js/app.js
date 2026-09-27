@@ -224,11 +224,18 @@ function route(id, { push = false } = {}) {
   shell.current = g.id;
   $$('.game-view').forEach((v) => (v.hidden = v.dataset.view !== g.id));
   const game = games[g.id];
-  if (!game.mounted) {
-    game.mounted = true;
-    game.mount($(`.game-view[data-view="${g.id}"]`));
+  const view = $(`.game-view[data-view="${g.id}"]`);
+  try {
+    if (!game.mounted) {
+      game.mounted = true;
+      game.mount(view);
+    }
+    if (game.show) game.show();
+  } catch (err) {
+    // Si un juego falla, el resto de la app sigue funcionando
+    console.error(`[${g.id}]`, err);
+    view.replaceChildren(h('div', { class: 'gv-stage', style: { padding: '50px 20px', textAlign: 'center' } }, `😕 No se pudo abrir ${g.name}. Recargá la página para intentar de nuevo.`));
   }
-  if (game.show) game.show();
   document.title = g.id === 'crash' ? 'CrashPY · El crash paraguayo 🇵🇾' : `${g.icon} ${g.name} · CrashPY`;
   $$('a', els.gameNav).forEach((a) => {
     const on = a.dataset.game === g.id;

@@ -63,8 +63,20 @@ export const state = {
   connections: 0,
   pending: { deposits: { n: 0, total: 0 }, withdrawals: { n: 0, total: 0 } },
   activity: [],
+  feed: [],
   conn: 'connecting',
 };
+
+/** Los juegos del casino (mismo orden que el menú del jugador). */
+export const GAME_META = {
+  crash: { icon: '🚀', name: 'Crash' },
+  mines: { icon: '💣', name: 'Minas' },
+  penalty: { icon: '⚽', name: 'Penales' },
+  double: { icon: '🎡', name: 'Double' },
+  plinko: { icon: '🔴', name: 'Plinko' },
+  roulette: { icon: '🎰', name: 'Ruleta' },
+};
+export const GAME_ORDER = ['crash', 'mines', 'penalty', 'double', 'plinko', 'roulette'];
 
 /** Llama a la API. Si la sesión venció avisa al resto de la app (muestra el login). */
 export async function call(path, opts) {

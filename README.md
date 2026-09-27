@@ -1,7 +1,8 @@
-# 🚀 CrashPY — el crash paraguayo en tiempo real
+# 🚀 CrashPY — el casino paraguayo en tiempo real 🇵🇾
 
-Juego **Crash** multijugador en **guaraníes (PYG)** que corre en tu PC y se juega desde el celular a través de **Cloudflare Tunnel**.
-Incluye resultados **comprobables (provably fair)**, **chat**, **depósitos y retiros por transferencia** y un **panel de administración en tiempo real**.
+Casino online en **guaraníes (PYG)** que corre en tu PC y se juega desde el celular a través de **Cloudflare Tunnel**:
+**🚀 Crash · 💣 Minas · ⚽ Penales de la Albirroja · 🎡 Double · 🔴 Plinko · 🎰 Ruleta**.
+Todos los resultados son **comprobables (provably fair)**, con **chat**, **depósitos y retiros por transferencia** y un **panel de administración en tiempo real**.
 
 <p align="center">
   <img src="docs/juego-celular.jpg" alt="CrashPY en el celular" width="260">
@@ -10,25 +11,40 @@ Incluye resultados **comprobables (provably fair)**, **chat**, **depósitos y re
 
 ![CrashPY en la PC](docs/juego-pc.jpg)
 
+## 🎮 Los juegos
+
+| Juego | Cómo se juega | Retorno (RTP) | Cómo se comprueba |
+|---|---|---|---|
+| 🚀 **Crash** (`/`) | El cohete sube: retirá antes de que explote. 2 apuestas por ronda, retiro y apuesta automáticos. | 97 % | Cadena de hashes |
+| 💣 **Minas** (`/minas`) | Tablero de 5×5 con 1 a 24 minas. Cada diamante sube el multiplicador; retirás cuando quieras. | 97 % | Semillas del jugador |
+| ⚽ **Penales** (`/penales`) | Pateá hasta 5 penales con la Albirroja: izquierda, centro o derecha. Cada gol multiplica (1,45x → 7,36x). | 97 % | Semillas del jugador |
+| 🎡 **Double** (`/double`) | Ruleta de colores multijugador: rojo 2x, negro 2x o blanco 30x. Una ronda cada ~25 segundos. | 96,8 % | Cadena de hashes propia |
+| 🔴 **Plinko** (`/plinko`) | Soltá bolitas: de 8 a 16 filas y 3 niveles de riesgo (hasta 1.000x). Con modo automático. | ~97 % | Semillas del jugador |
+| 🎰 **Ruleta** (`/ruleta`) | Ruleta europea (un solo 0) con mesa completa: plenos, docenas, columnas, colores, par/impar… | 97,3 % | Semillas del jugador |
+
+Cada juego tiene su dirección propia y se cambia de juego desde el menú de arriba sin perder el saldo, el chat ni la conexión.
+Las partidas de Minas y Penales quedan guardadas: si se cierra la página, al volver se sigue donde estaba.
+
 ## ✨ Qué trae
 
 **Para los jugadores**
-- Cohete con animaciones, estelas, explosión, sonidos y vibración en el celular.
+- Seis juegos con animaciones, sonidos y vibración en el celular (el premio aparece en el saldo cuando termina la animación, no antes).
 - Multiplicador en tiempo real (2x ≈ 11,5 s, 10x ≈ 38 s) y **retiro en cualquier momento**.
 - **2 apuestas por ronda**, **retiro automático** (funciona aunque se corte internet) y **apuesta automática**.
-- Apuestas en vivo de todos, historial de rondas, "Mis apuestas", **Top ganadores** del día / semana / mes.
+- Apuestas en vivo de todos, **jugadas en vivo de todo el casino**, historial, "Mis apuestas" de cada juego y **Top ganadores** del día / semana / mes.
 - **Chat** con emojis, anuncios del admin y avisos automáticos de ganancias grandes.
 - **Billetera**: depositar por transferencia (con foto del comprobante), retirar a cualquier banco o billetera, movimientos y estado de solicitudes.
 - Se puede **instalar como app** en el celular ("Agregar a pantalla de inicio").
-- Página **/fair** para verificar cualquier ronda (SHA-256), sin depender del servidor.
+- Página **/fair** para verificar cualquier ronda o jugada (SHA-256) en el propio celular, y **"Mis semillas"** para elegir tu semilla y revelar la del servidor.
 
 **Para el administrador (`/admin`)**
 - Tablero en vivo: conectados, qué apuesta cada uno, ganancia de la casa por hora/día, actividad.
-- **Ronda en vivo** con todas las apuestas, botón **💥 Explotar ahora** y **⏸ Pausar / ▶ Reanudar**.
-- **Usuarios**: buscar, ver ficha completa, **editar saldo** (sumar / restar / fijar), suspender, silenciar en el chat, cambiar contraseña, cuentas con la misma IP.
+- **Ronda en vivo** del Crash con todas las apuestas, botón **💥 Explotar ahora** y **⏸ Pausar / ▶ Reanudar**.
+- **Juegos**: prendé o pausá cada juego con un toque, ganancia de la casa por juego, **Double en vivo** (cuánto ganaría o perdería la casa según el color que salga), jugadas en vivo e historial de todas las jugadas con su detalle.
+- **Usuarios**: buscar, ver ficha completa (con sus jugadas de cada juego), **editar saldo** (sumar / restar / fijar), suspender, silenciar en el chat, cambiar contraseña, cuentas con la misma IP.
 - **Depósitos** (con foto del comprobante) y **retiros** (con datos bancarios para copiar): aprobar / rechazar con un toque. Avisos con sonido.
 - **Chat**: borrar mensajes, silenciar, anuncios.
-- **Configuración**: apuestas mínimas/máximas, ganancia máxima, tiempo para apostar, datos bancarios, WhatsApp de soporte, bono de bienvenida…
+- **Configuración**: apuestas mínimas/máximas, ganancia máxima, juegos activos, tiempos de apuesta del Crash y del Double, datos bancarios, WhatsApp de soporte, bono de bienvenida…
 - **Auditoría**: todo lo que hace cada admin queda registrado. **Libro contable**: cada guaraní que entra o sale queda anotado.
 - **Respaldos** automáticos de la base de datos cada 6 horas y descarga manual.
 
@@ -100,8 +116,8 @@ Todo se maneja en **guaraníes enteros** y **cada cambio de saldo queda en el li
 
 **Ajustes manuales**: en la ficha de cada usuario podés **sumar, restar o fijar** el saldo (por ejemplo, un depósito que te mandaron por WhatsApp). Siempre queda registrado con el motivo.
 
-**Ganancia de la casa**: viene de la **ventaja matemática** (por defecto **3 %**, RTP 97 %, como Aviator). En el largo plazo la casa se queda con ~3 % de todo lo apostado. Además podés limitar:
-- **Apuesta máxima** y **ganancia máxima por apuesta** (al llegar al tope se retira sola).
+**Ganancia de la casa**: viene de la **ventaja matemática** de cada juego (≈ 3 %: RTP 97 % en Crash, Minas, Penales y Plinko, 97,3 % en la Ruleta y 96,8 % en el Double). En el largo plazo la casa se queda con ~3 % de todo lo apostado. Además podés limitar:
+- **Apuesta máxima** y **ganancia máxima por apuesta o jugada** (en el Crash, Minas y Penales se cobra sola al llegar al tope; en Plinko y Ruleta el premio se limita a ese monto; en el Double limita cuánto se puede apostar al blanco).
 
 ---
 
@@ -116,7 +132,19 @@ Todo se maneja en **guaraníes enteros** y **cada cambio de saldo queda en el li
   crash = floor((100 − ventaja%) / (1 − X)) / 100     (mínimo 1.00x)
   ```
 - Tocando cualquier ronda del historial se ve su hash y se verifica en el mismo celular.
-- Para **cambiar la ventaja de la casa**: *Admin → Provably fair → Generar cadena nueva*. Se aplica desde la próxima ronda y la semilla de la cadena vieja se publica.
+- Para **cambiar la ventaja de la casa** del Crash: *Admin → Provably fair → Generar cadena nueva*. Se aplica desde la próxima ronda y la semilla de la cadena vieja se publica.
+
+**🎡 Double**: tiene su propia cadena de hashes (con su hash terminal publicado en `/fair`). La casilla ganadora sale igual que en el Crash:
+```
+hmac    = HMAC_SHA256(clave = sal, mensaje = hash)
+casilla = floor(primeros 52 bits de hmac / 2^52 × 31)      0 = blanco · impar = rojo · par = negro
+```
+El hash de la ronda se publica cuando la rueda empieza a girar (las apuestas ya están cerradas).
+
+**💣 Minas · ⚽ Penales · 🔴 Plinko · 🎰 Ruleta**: usan las **semillas de cada jugador**, como los casinos cripto más conocidos.
+- Antes de jugar, el servidor fija una **semilla secreta** y le muestra al jugador su **hash SHA-256**; el jugador elige **su propia semilla**; cada jugada usa el siguiente **nonce** (0, 1, 2…).
+- Los números al azar salen de `HMAC_SHA256(clave = semilla del servidor, mensaje = "semilla del cliente:nonce:ronda")`.
+- Desde **🔐 Justo → Mis semillas** el jugador cambia su par de semillas: en ese momento se **revela** la semilla del servidor y puede comprobar cada jugada (en el detalle de la jugada o en `/fair`). Mientras tenga una partida de Minas o Penales abierta no puede cambiarlas.
 
 ### 💥 Sobre el botón "Explotar ahora"
 El admin puede detener una ronda en vuelo en cualquier momento (por ejemplo si hay un problema). Para que el juego siga siendo **honesto y verificable**, al detenerla elegís:
@@ -133,8 +161,8 @@ La ronda queda marcada como **anulada** en el historial público junto con su ha
 
 - Contraseñas guardadas con **scrypt**; sesiones con cookies `HttpOnly`.
 - Límites contra abuso (intentos de login, registros, mensajes, acciones por segundo).
-- El punto de explosión **nunca** se envía antes de que la ronda termine.
-- Si el servidor se apaga o se corta la luz en medio de una ronda, al volver **la ronda se anula y se devuelven las apuestas**.
+- El punto de explosión **nunca** se envía antes de que la ronda termine; tampoco dónde están las minas o hacia dónde se tira el arquero mientras la partida sigue abierta.
+- Si el servidor se apaga o se corta la luz en medio de una ronda del Crash, al volver **la ronda se anula y se devuelven las apuestas**. En el Double: si todavía se apostaba, se devuelven las apuestas; si la rueda ya estaba girando (el resultado ya se vio), la ronda se paga normalmente. Las partidas de Minas y Penales quedan guardadas.
 - **Respaldos**: se guarda una copia de la base de datos cada 6 horas en `data\backups\` (se conservan los últimos 30). También podés descargar una desde *Admin → Configuración → Respaldos*.
   👉 **Copiá la carpeta `data` a un pendrive o a la nube de vez en cuando.** Ahí está todo: usuarios, saldos, apuestas y comprobantes.
 - No compartas la carpeta `data` ni el archivo `.env`.
@@ -171,7 +199,7 @@ Los juegos de azar con dinero real están regulados. En Paraguay la explotación
 npm install        # dependencias (express, socket.io)
 npm start          # servidor en http://localhost:3000
 npm run dev        # reinicia solo al guardar cambios
-npm test           # pruebas automáticas (apuestas, retiros, saldos, provably fair)
+npm test           # pruebas automáticas (juegos, apuestas, retiros, saldos, provably fair, cortes de luz)
 ```
 
 - **Servidor**: Node.js + Express 5 + Socket.IO + SQLite integrado (`node:sqlite`, sin compilar nada).
@@ -180,13 +208,21 @@ npm test           # pruebas automáticas (apuestas, retiros, saldos, provably f
 ```
 server/
   index.js        arranque, HTTP, seguridad
-  game.js         motor del juego (fases, apuestas, retiros, explosión, controles admin)
-  fair.js         cadena de hashes y fórmula del punto de explosión
+  game.js         motor del Crash (fases, apuestas, retiros, explosión, controles admin)
+  games/
+    seeds.js      semillas provably fair de cada jugador
+    plays.js      Minas, Penales, Plinko y Ruleta
+    double.js     motor del Double (rondas multijugador)
+  fair.js         cadenas de hashes y fórmula del punto de explosión
   wallet.js       saldos, libro contable, depósitos, retiros, ajustes
+  stats.js        estadísticas del panel (por juego)
   sockets.js      tiempo real (jugadores y /admin)
   routes/         API REST pública y de administración
 public/
-  index.html      juego · admin.html panel · fair.html verificación
-  js/ css/ img/
+  index.html      casino · admin.html panel · fair.html verificación
+  js/app.js       la app del jugador (saldo, billetera, chat, menú de juegos)
+  js/games/       un archivo por juego + common.js (piezas compartidas)
+  js/games-core.js  matemática de los juegos (la misma en el servidor y en el navegador)
+  css/ img/
 data/             base de datos, comprobantes y respaldos (se crea sola)
 ```

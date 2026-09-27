@@ -177,6 +177,7 @@ pre.code {
 }
 
 .result-hero small {
+  display: block;
   color: var(--muted);
 }
 
@@ -223,4 +224,239 @@ pre.code {
   .fair-card {
     padding: 14px;
   }
+}
+
+/* ───────── Pestañas por juego ───────── */
+.fair-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  position: sticky;
+  top: calc(58px + env(safe-area-inset-top));
+  z-index: 5;
+}
+
+.fair-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.fair-tabs button {
+  flex: 1 0 auto;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.fair-tabs button.active {
+  color: #fff;
+  background: linear-gradient(135deg, #d52b1e 0%, #7b2a8c 55%, #0038a8 100%);
+  box-shadow: 0 6px 18px rgba(0, 56, 168, 0.3);
+}
+
+.fair-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Double */
+.dtile {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-weight: 900;
+  font-size: 0.85rem;
+}
+
+.dtile.red,
+.dbig.red {
+  background: linear-gradient(180deg, #ff4d69, #d41f3d);
+  color: #fff;
+}
+
+.dtile.black,
+.dbig.black {
+  background: linear-gradient(180deg, #353a52, #1b1e2e);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.dtile.white,
+.dbig.white {
+  background: linear-gradient(180deg, #ffffff, #dfe4f5);
+  color: #d41f3d;
+}
+
+.result-hero .dbig {
+  display: grid;
+  place-items: center;
+  min-width: 96px;
+  height: 96px;
+  width: max-content;
+  margin: 6px auto;
+  padding: 0 14px;
+  border-radius: 22px;
+  font-size: 2.6rem;
+}
+
+.seed-result {
+  margin: 8px 0 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+/* Dibujos de las jugadas (igual que en el juego) */
+.mini-mines {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  max-width: 260px;
+  margin: 10px auto 14px;
+}
+
+.mini-mines .mm {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--panel-3);
+  font-size: 1.05rem;
+}
+
+.mini-mines .mm.gem {
+  background: rgba(43, 217, 107, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(43, 217, 107, 0.5);
+}
+
+.mini-mines .mm.mine {
+  background: rgba(255, 59, 78, 0.16);
+}
+
+.mini-mines .mm.hit {
+  background: rgba(255, 59, 78, 0.45);
+  box-shadow: inset 0 0 0 2px var(--red);
+}
+
+.mini-kicks {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+
+.mini-kicks .mk {
+  border-radius: 10px;
+  padding: 7px 5px;
+  text-align: center;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.mini-kicks .mk b {
+  display: block;
+  font-size: 0.82rem;
+}
+
+.mini-kicks .mk small {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.mini-plinko {
+  margin: 10px 0 14px;
+}
+
+.mp-path {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  margin-bottom: 8px;
+  color: var(--muted);
+}
+
+.mp-buckets {
+  display: flex;
+  gap: 3px;
+}
+
+.mp-buckets span {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 0;
+  border-radius: 6px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-align: center;
+  color: #1a0d00;
+  opacity: 0.55;
+}
+
+.mp-buckets span.on {
+  opacity: 1;
+  outline: 2px solid #fff;
+  transform: translateY(-2px);
+}
+
+.mp-buckets .hot {
+  background: #ff3b4e;
+  color: #fff;
+}
+
+.mp-buckets .warm {
+  background: #ff8a3d;
+}
+
+.mp-buckets .mid {
+  background: #ffc53d;
+}
+
+.mp-buckets .cold {
+  background: #ffe08a;
+}
+
+.mini-roulette .mr-number {
+  color: #fff;
+  width: 64px;
+  height: 64px;
+  margin: 10px auto 12px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.6rem;
+  font-weight: 900;
+  border: 3px solid rgba(255, 255, 255, 0.8);
+}
+
+.mini-roulette .mr-number.red {
+  background: #d8263a;
+}
+
+.mini-roulette .mr-number.black {
+  background: #151827;
+}
+
+.mini-roulette .mr-number.green {
+  background: #0f9d58;
+}
+
+.mini-roulette .table-wrap {
+  display: none;
 }

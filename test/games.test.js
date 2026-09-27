@@ -363,6 +363,13 @@ test('jugadas en vivo, estadísticas del panel y el libro contable cuadra', asyn
   const top = await p.c.get('/api/top');
   assert.ok(top.data.wins.length > 0);
 
+  // Cada juego tiene su dirección propia (la misma página)
+  for (const path of ['/crash', '/minas', '/penales', '/double', '/plinko', '/ruleta']) {
+    const res = await fetch(srv.url + path);
+    assert.equal(res.status, 200, path);
+    assert.match(await res.text(), /id="gameNav"/, path);
+  }
+
   // Libro contable: el saldo de cada jugador es exactamente la suma de sus movimientos
   const rows = db
     .prepare('SELECT u.id, u.balance, (SELECT COALESCE(SUM(amount), 0) FROM ledger l WHERE l.user_id = u.id) AS total FROM users u')

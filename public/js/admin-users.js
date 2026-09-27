@@ -1,5 +1,6 @@
 // Usuarios: listado con filtros y la ficha completa de cada jugador (saldo, bloqueos, historial).
 import { h, toast, confirmDialog, fmtGs, fmtNum, fmtSigned, fmtMult, fmtDate, parseAmount, multClass, copyText } from './shared.js';
+import { openPlayDetail } from './admin-games.js';
 import {
   bus,
   state,
@@ -20,6 +21,7 @@ import {
   ledgerChip,
   reqChip,
   betChip,
+  GAME_META,
   waNumber,
   uaShort,
   ago,
@@ -392,7 +394,7 @@ function infoRow(emoji, label, ...value) {
 }
 
 function renderDetail() {
-  const { user: u, bets, ledger, deposits, withdrawals, sessions, sameIp } = D.data;
+  const { user: u, bets, games = [], ledger, deposits, withdrawals, sessions, sameIp } = D.data;
   D.refs = { online: !!u.online };
   D.titleEl.textContent = u.username;
 
@@ -464,7 +466,8 @@ function renderDetail() {
 
   const tabBody = h('div', { class: 'ud-tab-body' });
   const tabs = [
-    ['bets', 'Apuestas', bets.length],
+    ['bets', 'Crash', bets.length],
+    ['games', 'Otros juegos', games.length],
     ['ledger', 'Movimientos', ledger.length],
     ['deposits', 'Depósitos', deposits.length],
     ['withdrawals', 'Retiros', withdrawals.length],
@@ -662,6 +665,31 @@ function noteEditor(u) {
 
 // ── Pestañas de historial
 
+const GAME_COLS = [
+  {
+    label: 'Jugada',
+    main: true,
+    render: (g) => {
+      const meta = GAME_META[g.game] || GAME_META.crash;
+      return h('span', { class: 'round-id' }, `${meta.icon} ${meta.name} ${g.game === 'double' ? `· ronda #${g.round_id}` : `#${g.id}`}`);
+    },
+  },
+  { label: 'Monto', cls: 'num', render: (g) => fmtGs(g.amount) },
+  { label: 'Detalle', cls: 'wrap-cell', render: (g) => g.detail },
+  { label: 'x', cls: 'num', render: (g) => (g.status === 'won' ? h('b', { class: multClass(g.multiplier) }, fmtMult(g.multiplier)) : null) },
+  {
+    label: 'Resultado',
+    cls: 'num',
+    render: (g) =>
+      g.status === 'active'
+        ? h('span', { class: 'chip chip-gold' }, 'En curso')
+        : g.status === 'refunded'
+          ? h('span', { class: 'chip' }, 'Devuelta')
+          : h('span', { class: g.payout - g.amount >= 0 ? 'green' : 'red' }, fmtSigned(g.payout - g.amount)),
+  },
+  { label: 'Fecha', cls: 'num', render: (g) => fmtDate(g.created_at) },
+];
+
 const BET_COLS = [
   { label: 'Ronda', main: true, render: (b) => h('span', { class: 'round-id' }, `Ronda #${b.round_id}`) },
   { label: 'Monto', cls: 'num', render: (b) => fmtGs(b.amount) },
@@ -748,7 +776,15 @@ function tabContent(tab, u) {
   const d = D.data;
   switch (tab) {
     case 'bets':
-      return dataTable(BET_COLS, d.bets, { empty: 'Todavía no apostó', emptyEmoji: '🎯', compact: true, mobileLimit: 15 });
+      return dataTable(BET_COLS, d.bets, { empty: 'Todavía no apostó en el Crash', emptyEmoji: '🚀', compact: true, mobileLimit: 15 });
+    case 'games':
+      return dataTable(GAME_COLS, (d.games || []).map((g) => ({ ...g, username: u.username })), {
+        onRow: openPlayDetail,
+        empty: 'Todavía no jugó Minas, Penales, Double, Plinko ni Ruleta',
+        emptyEmoji: '🎲',
+        compact: true,
+        mobileLimit: 15,
+      });
     case 'ledger':
       return dataTable(LEDGER_COLS, d.ledger, { empty: 'Sin movimientos de saldo', emptyEmoji: '📒', compact: true, mobileLimit: 15 });
     case 'deposits':
