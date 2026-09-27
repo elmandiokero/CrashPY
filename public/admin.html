@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#060913" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CrashPY Admin" />
+    <title>Admin · CrashPY</title>
+    <link rel="icon" href="/img/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/admin.css" />
+  </head>
+  <body class="admin">
+    <div id="app">
+      <div class="boot" aria-busy="true">
+        <div class="boot-mark">🚀</div>
+        <div class="boot-name">Crash<span class="py">PY</span></div>
+        <span class="spinner"></span>
+      </div>
+    </div>
+    <noscript>
+      <p class="noscript">El panel de administración necesita JavaScript activado.</p>
+    </noscript>
+    <script src="/socket.io/socket.io.min.js"></script>
+    <script type="module" src="/js/admin.js"></script>
+  </body>
+</html>
