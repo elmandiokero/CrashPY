@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Provably Fair · CrashPY</title>
+  <meta name="description" content="Cómo verificar que cada ronda de CrashPY es justa: cadena de hashes SHA-256 publicada de antemano.">
+  <meta name="theme-color" content="#060913">
+  <link rel="icon" href="/img/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/fair.css">
+</head>
+<body>
+  <header class="fair-top">
+    <a class="fair-logo" href="/"><img src="/img/icon.svg" alt="" width="32" height="32"> <span>Crash<b>PY</b></span></a>
+    <a class="btn btn-primary btn-sm" href="/">🚀 Volver a jugar</a>
+  </header>
+
+  <main class="fair-main">
+    <section class="fair-hero">
+      <div class="fair-badge">🔐 Provably Fair</div>
+      <h1>Cada ronda se puede comprobar</h1>
+      <p>Los resultados de CrashPY no se inventan en el momento: salen de una cadena de hashes que se publica <b>antes</b> de jugar. Ni el casino puede cambiar una ronda sin que se note.</p>
+    </section>
+
+    <section class="card fair-card">
+      <h2>¿Cómo funciona?</h2>
+      <ol class="fair-steps">
+        <li><b>Semilla secreta.</b> El servidor genera una semilla al azar y le aplica SHA-256 una y otra vez, formando una cadena de hasta 1.000.000 de hashes.</li>
+        <li><b>Se publica el final.</b> El último eslabón (el <i>hash terminal</i>) se publica acá abajo antes de la primera ronda.</li>
+        <li><b>Se juega hacia atrás.</b> La ronda 1 usa el penúltimo hash, la ronda 2 el anterior, y así. Como SHA-256 no se puede revertir, nadie puede saber el hash de la próxima ronda, pero sí comprobar el de cada ronda terminada: <span class="mono">SHA256(hash de la ronda) = hash de la ronda anterior</span>.</li>
+        <li><b>Del hash al multiplicador.</b> El punto de explosión se calcula con una fórmula pública (ver abajo) usando el hash de la ronda y una <i>sal</i> pública. Todo se revela cuando la ronda explota.</li>
+        <li><b>Rondas anuladas.</b> Si el servidor se reinicia o el administrador detiene una ronda, la ronda queda marcada como <i>anulada</i> y nadie pierde su apuesta (se devuelve o se paga al multiplicador de ese momento). Su hash se publica igual.</li>
+      </ol>
+      <div class="formula">
+        <div class="formula-title">Fórmula</div>
+<pre>hmac  = HMAC_SHA256(clave = sal, mensaje = hash_de_la_ronda)
+r     = primeros 13 caracteres hex de hmac  (52 bits)
+X     = r / 2^52
+crash = floor( (100 − ventaja%) / (1 − X) ) / 100      (mínimo 1.00x)</pre>
+      </div>
+    </section>
+
+    <section class="card fair-card" id="chainCard">
+      <h2>Cadena actual</h2>
+      <div id="chainInfo"><div class="empty"><span class="spinner"></span></div></div>
+    </section>
+
+    <section class="card fair-card">
+      <h2>Verificador</h2>
+      <p class="muted">Pegá el hash de una ronda (lo ves tocando cualquier ronda del historial en el juego). Todo se calcula en tu dispositivo, sin preguntarle nada al servidor.</p>
+      <form id="verifyForm" class="verify-form" autocomplete="off">
+        <div class="field"><label for="vHash">Hash de la ronda</label><input class="input mono" id="vHash" placeholder="64 caracteres hexadecimales" spellcheck="false"></div>
+        <div class="field-row">
+          <div class="field"><label for="vSalt">Sal (salt)</label><input class="input mono" id="vSalt" spellcheck="false"></div>
+          <div class="field"><label for="vEdge">Ventaja de la casa (%)</label><input class="input" id="vEdge" inputmode="decimal" value="3"></div>
+        </div>
+        <div class="field"><label for="vCount">Rondas anteriores a mostrar</label><input class="input" id="vCount" inputmode="numeric" value="20"></div>
+        <button class="btn btn-blue btn-block" type="submit">Calcular</button>
+      </form>
+      <div id="verifyOut"></div>
+    </section>
+
+    <section class="card fair-card">
+      <h2>Verificalo con tu propio código</h2>
+      <p class="muted">Podés correr esto en tu compu (Node.js o Python) para obtener el mismo resultado:</p>
+      <div class="code-title">JavaScript (Node.js)</div>
+<pre class="code">const crypto = require('crypto');
+function crash(hash, salt, edgePercent = 3) {
+  const hmac = crypto.createHmac('sha256', salt).update(hash).digest('hex');
+  const x = parseInt(hmac.slice(0, 13), 16) / 2 ** 52;
+  return Math.max(100, Math.floor((100 - edgePercent) / (1 - x))) / 100;
+}
+const prev = (hash) => crypto.createHash('sha256').update(hash).digest('hex');</pre>
+      <div class="code-title">Python</div>
+<pre class="code">import hmac, hashlib
+def crash(game_hash, salt, edge_percent=3):
+    h = hmac.new(salt.encode(), game_hash.encode(), hashlib.sha256).hexdigest()
+    x = int(h[:13], 16) / 2**52
+    return max(100, int((100 - edge_percent) / (1 - x))) / 100
+prev = lambda h: hashlib.sha256(h.encode()).hexdigest()</pre>
+      <p class="hint">Nota: el hash se aplica sobre el texto hexadecimal (UTF-8), igual que en cualquier calculadora SHA-256 online.</p>
+    </section>
+
+    <section class="card fair-card" id="prevCard" hidden>
+      <h2>Cadenas terminadas (semilla revelada)</h2>
+      <div id="prevChains"></div>
+    </section>
+  </main>
+
+  <footer class="fair-foot">🇵🇾 CrashPY · +18 · Jugá con responsabilidad</footer>
+  <script type="module" src="/js/fair-page.js"></script>
+</body>
+</html>
